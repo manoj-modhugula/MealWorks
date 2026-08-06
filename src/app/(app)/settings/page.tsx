@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
-import { Alert, Card, Page, PageHeader, PageSkeleton } from "@/components/ui";
+import { Alert, Card, ChipGroup, Page, PageHeader, PageSkeleton } from "@/components/ui";
+import { useTheme } from "@/components/theme-provider";
+import type { ThemePreference } from "@/lib/theme";
 import { deviceTimeZone } from "@/lib/client-date";
 import { getCache, setCache } from "@/lib/client-cache";
 
@@ -18,6 +20,7 @@ type SettingsCache = {
 };
 
 export default function SettingsPage() {
+  const { preference, setPreference } = useTheme();
   const cached0 = getCache<SettingsCache>("settings");
   const [loading, setLoading] = useState(!cached0);
   const [emailEnabled, setEmailEnabled] = useState(
@@ -172,6 +175,26 @@ export default function SettingsPage() {
         {error && <Alert tone="bad">{error}</Alert>}
 
         <div className="card-grid-2">
+          <Card className="space-y-3">
+            <h2 className="card-title">Appearance</h2>
+            <p className="text-sm text-[var(--muted)]">
+              Choose light glass, dark glass, or match your device.
+            </p>
+            <ChipGroup
+              multi={false}
+              options={[
+                { value: "light", label: "Light" },
+                { value: "dark", label: "Dark" },
+                { value: "system", label: "System" },
+              ]}
+              selected={[preference]}
+              onChange={(next) => {
+                const choice = next[0] as ThemePreference | undefined;
+                if (choice) setPreference(choice);
+              }}
+            />
+          </Card>
+
           <Card className="space-y-3">
             <h2 className="card-title">Morning digest</h2>
             <p className="text-sm text-[var(--muted)]">

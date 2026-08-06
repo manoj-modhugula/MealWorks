@@ -42,7 +42,7 @@ export function TagInput({
         {value.map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg)] px-2.5 py-1 text-xs font-semibold text-[var(--ink)] ring-1 ring-black/10"
+            className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg)] px-2.5 py-1 text-xs font-semibold text-[var(--ink)] ring-1 ring-[var(--chip-ring)]"
           >
             {tag}
             <button
@@ -56,7 +56,7 @@ export function TagInput({
           </span>
         ))}
         <input
-          className="min-w-[8rem] flex-1 bg-transparent px-1 py-1 text-sm text-[var(--ink)] outline-none placeholder:text-[#8e8e93]"
+          className="min-w-[8rem] flex-1 bg-transparent px-1 py-1 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--field-placeholder)]"
           value={draft}
           placeholder={value.length ? "" : placeholder}
           onChange={(e) => setDraft(e.target.value)}

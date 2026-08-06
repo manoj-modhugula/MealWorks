@@ -1,13 +1,16 @@
 "use client";
 
 import { SessionProvider } from "next-auth/react";
+import { ThemeProvider } from "./theme-provider";
 import { TimezoneSync } from "./timezone-sync";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <TimezoneSync />
-      {children}
+      <ThemeProvider>
+        <TimezoneSync />
+        {children}
+      </ThemeProvider>
     </SessionProvider>
   );
 }

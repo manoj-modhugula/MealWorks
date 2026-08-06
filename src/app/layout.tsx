@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { ThemeScript } from "@/components/theme-script";
+import { THEME_COLORS } from "@/lib/theme";
 import "./globals.css";
 
 /** Soft display serif — headlines with warmth */
@@ -26,7 +28,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#eef1f6",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -40,6 +45,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body className={`${fraunces.variable} ${jakarta.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>
