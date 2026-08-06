@@ -5,7 +5,7 @@ export type ResolvedTheme = "light" | "dark";
 
 export const THEME_COLORS: Record<ResolvedTheme, string> = {
   light: "#eef1f6",
-  dark: "#0f1117",
+  dark: "#070708",
 };
 
 export function getSystemTheme(): ResolvedTheme {
