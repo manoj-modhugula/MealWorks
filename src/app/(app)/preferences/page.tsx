@@ -242,22 +242,40 @@ export default function PreferencesPage() {
 
           <Card className="space-y-3">
             <h2 className="card-title">Temporary</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <input
-                className="field"
-                placeholder="Label"
-                value={tempLabel}
-                onChange={(e) => setTempLabel(e.target.value)}
-              />
-              <input
-                className="field"
-                type="date"
-                value={tempEnd}
-                onChange={(e) => setTempEnd(e.target.value)}
-              />
+            <div className="field-row-2">
+              <div>
+                <label className="label" htmlFor="temp-label">
+                  Label
+                </label>
+                <input
+                  id="temp-label"
+                  className="field"
+                  placeholder="e.g. sick day"
+                  value={tempLabel}
+                  onChange={(e) => setTempLabel(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="temp-end">
+                  Until
+                </label>
+                <div className="field-shell">
+                  <input
+                    id="temp-end"
+                    className="field field-native"
+                    type="date"
+                    value={tempEnd}
+                    onChange={(e) => setTempEnd(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
             <TagInput value={tempTags} onChange={setTempTags} placeholder="Tags" />
-            <button type="button" className="btn btn-secondary" onClick={addTemp}>
+            <button
+              type="button"
+              className="btn btn-primary mt-1"
+              onClick={addTemp}
+            >
               Add
             </button>
             <ul className="space-y-2 text-sm">
