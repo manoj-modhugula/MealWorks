@@ -336,14 +336,16 @@ export default function AdminPage() {
         {(tab === "post" || tab === "extract" || tab === "preview") && (
           <Card className="!p-4">
             <div className="flex flex-wrap items-end gap-3">
-              <div>
+              <div className="min-w-0 max-w-xs flex-1 basis-[12rem]">
                 <label className="label">Date</label>
-                <input
-                  className="field max-w-xs"
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
+                <div className="field-shell">
+                  <input
+                    className="field field-native"
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
+                </div>
               </div>
               <button
                 type="button"
@@ -412,7 +414,7 @@ export default function AdminPage() {
                     </span>
                     <button
                       type="button"
-                      className="icon-btn !h-8 !w-8"
+                      className="icon-btn icon-btn-danger !h-8 !w-8"
                       onClick={() => deleteDay(m.date)}
                       aria-label="Delete"
                     >
@@ -473,7 +475,7 @@ export default function AdminPage() {
                 <img
                   src={previewUrl}
                   alt="Preview"
-                  className="max-h-56 w-full rounded-xl object-contain bg-black/5"
+                  className="max-h-56 w-full rounded-xl object-contain bg-[var(--image-well)]"
                 />
               )}
               <button
@@ -542,7 +544,7 @@ export default function AdminPage() {
                       />
                       <button
                         type="button"
-                        className="icon-btn !h-9 !w-9"
+                        className="icon-btn icon-btn-danger !h-9 !w-9"
                         onClick={() => patchItem(it, { delete: true })}
                         aria-label="Delete dish"
                       >
@@ -562,7 +564,7 @@ export default function AdminPage() {
         {tab === "preview" && (
           <Card className="space-y-3">
             <h2 className="card-title">Preview as employee</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="field-row-2">
               <div>
                 <label className="label">Diet</label>
                 <select
@@ -630,7 +632,11 @@ export default function AdminPage() {
                   </div>
                   <button
                     type="button"
-                    className="btn btn-secondary !py-1.5 !text-xs"
+                    className={
+                      u.isAdmin
+                        ? "btn btn-danger !py-1.5 !text-xs"
+                        : "btn btn-secondary !py-1.5 !text-xs"
+                    }
                     disabled={u.id === session?.user?.id}
                     onClick={() => toggleAdmin(u.id, !u.isAdmin)}
                   >

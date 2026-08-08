@@ -231,7 +231,7 @@ export function Skeleton({
   return (
     <div
       className={cn(
-        "animate-pulse rounded-[10px] bg-[rgba(0,0,0,0.06)]",
+        "animate-pulse rounded-[10px] bg-[var(--skeleton-fill)]",
         className
       )}
       aria-hidden
