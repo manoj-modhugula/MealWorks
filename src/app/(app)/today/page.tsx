@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
-  RefreshCw,
   ThumbsDown,
   ThumbsUp,
   Utensils,
 } from "lucide-react";
 import {
   Alert,
+  BookLoader,
   Card,
   DecisionBadge,
   EmptyState,
@@ -285,19 +285,15 @@ export default function TodayPage() {
               onChange={setDate}
               maxDate={todayOnDevice()}
             />
+            {/* RefreshCw removed — book button is the rematch control */}
             <button
               type="button"
-              className="icon-btn"
+              className="icon-btn book-refresh-btn"
               aria-label={bookBusy ? "Refreshing match" : "Refresh match"}
               disabled={bookBusy}
               onClick={() => load({ rematch: true })}
             >
-              <RefreshCw
-                size={18}
-                strokeWidth={2}
-                className={bookBusy ? "animate-spin" : undefined}
-                aria-hidden
-              />
+              <BookLoader label="" compact flipping={bookBusy} />
             </button>
           </>
         }

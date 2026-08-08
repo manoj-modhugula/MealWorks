@@ -200,26 +200,47 @@ export function Alert({
   );
 }
 
-/** Standard loading indicator. */
-export function Spinner({
-  label = "Loading…",
+/** Tiny book with pages flipping — loading easter egg. */
+export function BookLoader({
+  label = "Flipping through…",
   compact = false,
+  /** When false, show a still book (no page flip). Default: flip. */
+  flipping = true,
 }: {
   label?: string;
   compact?: boolean;
+  flipping?: boolean;
 }) {
   const showLabel = Boolean(label && label.trim());
   return (
     <div
-      className={cn("mw-spinner", compact && "mw-spinner-compact")}
+      className={cn(
+        "book-loader",
+        compact ? "book-loader-compact" : undefined,
+        flipping ? "is-flipping" : "is-still"
+      )}
       role="status"
       aria-live="polite"
-      aria-label={showLabel ? label : "Loading"}
+      aria-label={showLabel ? label : flipping ? "Loading" : "Ready"}
     >
-      <span className="mw-spinner-ring" aria-hidden />
-      {showLabel ? <p className="mw-spinner-label">{label}</p> : null}
+      <div className="book" aria-hidden>
+        <div className="book-cover book-cover-left" />
+        <div className="book-pages">
+          <div className="book-page book-page-static" />
+          <div className="book-page book-page-flip" />
+          <div className="book-page book-page-flip book-page-flip-delay" />
+        </div>
+        <div className="book-cover book-cover-right" />
+        <div className="book-spine" />
+      </div>
+      {showLabel ? <p className="book-loader-label">{label}</p> : null}
     </div>
   );
+}
+
+/** Compact flipping book — drop-in loading indicator. */
+export function Spinner({ label = "Loading…" }: { label?: string }) {
+  return <BookLoader label={label} compact flipping />;
 }
 
 /** Soft placeholder — prefer over full-page Spinner for navigation. */
@@ -241,14 +262,14 @@ export function Skeleton({
 
 export function PageSkeleton({
   rows = 3,
-  label = "Loading…",
+  label = "Flipping through today’s menu…",
 }: {
   rows?: number;
   label?: string;
 }) {
   return (
     <div className="space-y-5" role="status" aria-label={label}>
-      <Spinner label={label} />
+      <BookLoader label={label} />
       <div className="space-y-3">
         <Skeleton className="h-20 w-full" />
         {Array.from({ length: Math.max(0, rows - 1) }).map((_, i) => (
