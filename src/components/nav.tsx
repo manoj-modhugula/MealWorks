@@ -20,6 +20,13 @@ import {
   UtensilsCrossed,
   Wrench,
 } from "lucide-react";
+import {
+  followLerp,
+  lerp,
+  liquidPillAt,
+  nearestTab,
+  type TabGeom,
+} from "@/lib/nav-pill";
 
 const baseLinks = [
   { href: "/today", label: "Today", Icon: Sun },
@@ -47,19 +54,6 @@ const SCRUB_AXIS_RATIO = 1.25; // |dx| must beat |dy| * this
 /** Settle onto a tab after release — springy / overshoot */
 const PILL_EASE = "cubic-bezier(0.22, 1.4, 0.36, 1)";
 const PILL_MS = 380;
-/** Extra width at mid-gap (liquid droplet stretch), px */
-const DROPLET_STRETCH = 22;
-/** Squash Y while stretched (volume-ish) */
-const DROPLET_SQUASH = 0.1;
-/** Follow finger with lag (0–1). Lower = more elastic pull */
-const FOLLOW_LERP = 0.28;
-
-type TabGeom = {
-  href: string;
-  left: number;
-  width: number;
-  center: number;
-};
 
 type ScrubMode = "idle" | "pending" | "scrubbing";
 
@@ -69,101 +63,6 @@ function activeHrefFor(pathname: string, hrefs: string[]) {
     hrefs[0] ||
     "/today"
   );
-}
-
-function nearestTab(geoms: TabGeom[], localX: number): TabGeom | null {
-  if (!geoms.length) return null;
-  let best = geoms[0];
-  let bestDist = Math.abs(localX - best.center);
-  for (let i = 1; i < geoms.length; i++) {
-    const d = Math.abs(localX - geoms[i].center);
-    if (d < bestDist) {
-      best = geoms[i];
-      bestDist = d;
-    }
-  }
-  return best;
-}
-
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
-}
-
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-
-function smoothstep(t: number) {
-  const x = clamp(t, 0, 1);
-  return x * x * (3 - 2 * x);
-}
-
-/**
- * Liquid droplet morph: continuous left/width between tabs.
- * Fattens mid-gap (stretch) and picks nearest for highlight.
- */
-function liquidPillAt(
-  geoms: TabGeom[],
-  localX: number
-): { left: number; width: number; scaleY: number; href: string } | null {
-  if (!geoms.length) return null;
-  if (geoms.length === 1) {
-    const g = geoms[0];
-    return { left: g.left, width: g.width, scaleY: 1, href: g.href };
-  }
-
-  const minC = geoms[0].center;
-  const maxC = geoms[geoms.length - 1].center;
-  const x = clamp(localX, minC, maxC);
-
-  // Before first / after last center → rest on end tab
-  if (x <= minC) {
-    const g = geoms[0];
-    return { left: g.left, width: g.width, scaleY: 1, href: g.href };
-  }
-  if (x >= maxC) {
-    const g = geoms[geoms.length - 1];
-    return { left: g.left, width: g.width, scaleY: 1, href: g.href };
-  }
-
-  // Segment between consecutive centers
-  let i = 0;
-  for (; i < geoms.length - 1; i++) {
-    if (x >= geoms[i].center && x <= geoms[i + 1].center) break;
-  }
-  const A = geoms[i];
-  const B = geoms[i + 1];
-  const span = B.center - A.center || 1;
-  const t = smoothstep((x - A.center) / span);
-
-  // Base morph A → B
-  let left = lerp(A.left, B.left, t);
-  let width = lerp(A.width, B.width, t);
-
-  // Droplet belly: extra stretch mid-travel (peaks at t=0.5)
-  const belly = 4 * t * (1 - t); // 0..1..0
-  width += DROPLET_STRETCH * belly;
-  // Keep visual center tracking the blend of centers
-  const center = lerp(A.center, B.center, t);
-  left = center - width / 2;
-
-  // Soft rubber at strip ends (slight resistance past first/last left edges)
-  const minL = geoms[0].left;
-  const maxR = geoms[geoms.length - 1].left + geoms[geoms.length - 1].width;
-  if (left < minL) {
-    const over = minL - left;
-    left = minL - over * 0.25;
-    width = Math.max(width - over * 0.15, A.width * 0.85);
-  }
-  if (left + width > maxR) {
-    const over = left + width - maxR;
-    width = Math.max(width - over * 0.15, B.width * 0.85);
-    left = maxR - width + over * 0.25;
-  }
-
-  const scaleY = 1 - DROPLET_SQUASH * belly;
-  const href = t < 0.5 ? A.href : B.href;
-  return { left, width, scaleY, href };
 }
 
 export function AppNav() {
@@ -338,48 +237,57 @@ export function AppNav() {
     [paintPillBox]
   );
 
-  /** rAF spring-follow toward goal while scrubbing */
+  /** rAF spring-follow toward goal while scrubbing (adaptive for multi-tab). */
   const tickScrubFollow = useCallback(() => {
     const s = scrubRef.current;
     s.raf = null;
     if (s.mode !== "scrubbing") return;
 
-    s.curLeft = lerp(s.curLeft, s.goalLeft, FOLLOW_LERP);
-    s.curWidth = lerp(s.curWidth, s.goalWidth, FOLLOW_LERP);
-    s.curScaleY = lerp(s.curScaleY, s.goalScaleY, FOLLOW_LERP);
+    const dist = Math.hypot(
+      s.goalLeft - s.curLeft,
+      s.goalWidth - s.curWidth
+    );
+    const k = followLerp(dist);
+    s.curLeft = lerp(s.curLeft, s.goalLeft, k);
+    s.curWidth = lerp(s.curWidth, s.goalWidth, k);
+    s.curScaleY = lerp(s.curScaleY, s.goalScaleY, k);
 
     paintPillBox(s.curLeft, s.curWidth, {
       animate: false,
       scaleY: s.curScaleY,
     });
 
-    const dx = Math.abs(s.goalLeft - s.curLeft);
-    const dw = Math.abs(s.goalWidth - s.curWidth);
-    if (dx > 0.15 || dw > 0.15 || Math.abs(s.goalScaleY - s.curScaleY) > 0.002) {
+    // Keep the loop alive for the whole scrub so multi-tab goal jumps never stall
+    if (s.mode === "scrubbing") {
       s.raf = requestAnimationFrame(tickScrubFollow);
     }
   }, [paintPillBox]);
 
   const setLiquidGoal = useCallback(
     (localX: number) => {
-      const morph = liquidPillAt(geomsRef.current, localX);
+      // Live geometry so multi-tab centers stay aligned with the finger
+      const geoms = measureTabs();
+      const morph = liquidPillAt(geoms, localX);
       if (!morph) return;
       const s = scrubRef.current;
       s.goalLeft = morph.left;
       s.goalWidth = morph.width;
       s.goalScaleY = morph.scaleY;
-      s.targetHref = morph.href;
 
-      if (highlightRef.current !== morph.href) {
-        highlightRef.current = morph.href;
-        setHighlightHref(morph.href);
+      const near = nearestTab(geoms, localX);
+      const href = near?.href ?? morph.href;
+      s.targetHref = href;
+
+      if (highlightRef.current !== href) {
+        highlightRef.current = href;
+        setHighlightHref(href);
       }
 
       if (s.raf == null) {
         s.raf = requestAnimationFrame(tickScrubFollow);
       }
     },
-    [tickScrubFollow]
+    [measureTabs, tickScrubFollow]
   );
 
   function detachWindowScrub() {
@@ -432,21 +340,18 @@ export function AppNav() {
       // Block the synthetic click that follows pointerup
       s.suppressClickUntil = performance.now() + 450;
 
+      // Fresh measure + finger position — never stick to scrub-start tab
+      const geoms = measureTabs();
       let target = s.targetHref || routeActiveRef.current;
       if (nav && opts.clientX != null) {
         const localX = opts.clientX - nav.getBoundingClientRect().left;
-        // Prefer droplet segment nearest; fall back to center nearest
-        const morph = liquidPillAt(geomsRef.current, localX);
-        if (morph) target = morph.href;
-        else {
-          const near = nearestTab(geomsRef.current, localX);
-          if (near) target = near.href;
-        }
+        const near = nearestTab(geoms, localX);
+        const morph = liquidPillAt(geoms, localX);
+        target = near?.href ?? morph?.href ?? target;
       }
 
       // Elastic settle onto target (overshoot ease)
-      measureTabs();
-      paintPill(target, { animate: true });
+      paintPill(target, { animate: true, geoms });
       s.targetHref = target;
 
       if (opts.commit && target !== routeActiveRef.current) {
@@ -765,10 +670,10 @@ export function AppNav() {
 
         s.mode = "scrubbing";
         s.targetHref = routeActiveRef.current;
-        // Seed follow from current painted position
-        const seed = geomsRef.current.find(
-          (t) => t.href === routeActiveRef.current
-        );
+        // Remeasure after layout; seed follow from current tab
+        const geoms = measureTabs();
+        const seed =
+          geoms.find((t) => t.href === routeActiveRef.current) || geoms[0];
         if (seed) {
           s.curLeft = seed.left;
           s.curWidth = seed.width;
