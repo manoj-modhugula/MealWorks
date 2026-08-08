@@ -200,11 +200,10 @@ export function Alert({
   );
 }
 
-/** Tiny book with pages flipping — loading easter egg. */
+/** 3D book used as the loading indicator. */
 export function BookLoader({
   label = "Flipping through…",
   compact = false,
-  /** When false, show a still book (no page flip). Default: flip. */
   flipping = true,
 }: {
   label?: string;
@@ -238,12 +237,12 @@ export function BookLoader({
   );
 }
 
-/** Compact flipping book — drop-in loading indicator. */
+/** Compact flipping book. */
 export function Spinner({ label = "Loading…" }: { label?: string }) {
   return <BookLoader label={label} compact flipping />;
 }
 
-/** Soft placeholder — prefer over full-page Spinner for navigation. */
+/** Pulse block placeholder. */
 export function Skeleton({
   className,
 }: {

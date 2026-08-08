@@ -65,7 +65,6 @@ export default function TodayPage() {
   const cached0 = getCache<TodayCache>(`today:${todayOnDevice()}`);
   const [loading, setLoading] = useState(!cached0?.match && !cached0?.menu);
   const [polishing, setPolishing] = useState(false);
-  /** True only after user taps the book — pages flip until done */
   const [bookBusy, setBookBusy] = useState(false);
   const [error, setError] = useState("");
   const [menu, setMenu] = useState<{
@@ -285,7 +284,6 @@ export default function TodayPage() {
               onChange={setDate}
               maxDate={todayOnDevice()}
             />
-            {/* RefreshCw removed — book button is the rematch control */}
             <button
               type="button"
               className="icon-btn book-refresh-btn"
