@@ -28,6 +28,11 @@ import { isEmailConfigured, sendEmail } from "./email";
 import { buildDigestEmail } from "./digest-email";
 import { mergeAlwaysOnStations } from "./salad-compose";
 import { compactSkipTerms } from "./profile-bio";
+import {
+  DEFAULT_CAFE_HOURS,
+  normalizeCafeHours,
+  type CafeHours,
+} from "./meal-hours";
 
 /** Invalidate only one user's matches (all days). Rare full reset. */
 export function invalidateUserMatches(userId: string) {
@@ -1140,4 +1145,56 @@ export function latestDigest(userId: string) {
     .where(eq(schema.digestLogs.userId, userId))
     .orderBy(desc(schema.digestLogs.createdAt))
     .get();
+}
+
+const CAFE_HOURS_ID = "default";
+
+export function getCafeHours(): CafeHours {
+  const row = getDb()
+    .select()
+    .from(schema.cafeSettings)
+    .where(eq(schema.cafeSettings.id, CAFE_HOURS_ID))
+    .get();
+  if (!row) return { ...DEFAULT_CAFE_HOURS };
+  return normalizeCafeHours({
+    breakfastStart: row.breakfastStart,
+    breakfastEnd: row.breakfastEnd,
+    lunchStart: row.lunchStart,
+    lunchEnd: row.lunchEnd,
+  });
+}
+
+export function saveCafeHours(input: CafeHours): CafeHours {
+  const hours = normalizeCafeHours(input);
+  const db = getDb();
+  const existing = db
+    .select({ id: schema.cafeSettings.id })
+    .from(schema.cafeSettings)
+    .where(eq(schema.cafeSettings.id, CAFE_HOURS_ID))
+    .get();
+  const updatedAt = nowISO();
+  if (existing) {
+    db.update(schema.cafeSettings)
+      .set({
+        breakfastStart: hours.breakfastStart,
+        breakfastEnd: hours.breakfastEnd,
+        lunchStart: hours.lunchStart,
+        lunchEnd: hours.lunchEnd,
+        updatedAt,
+      })
+      .where(eq(schema.cafeSettings.id, CAFE_HOURS_ID))
+      .run();
+  } else {
+    db.insert(schema.cafeSettings)
+      .values({
+        id: CAFE_HOURS_ID,
+        breakfastStart: hours.breakfastStart,
+        breakfastEnd: hours.breakfastEnd,
+        lunchStart: hours.lunchStart,
+        lunchEnd: hours.lunchEnd,
+        updatedAt,
+      })
+      .run();
+  }
+  return hours;
 }

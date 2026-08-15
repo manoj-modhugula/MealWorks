@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import {
   getActiveMenu,
+  getCafeHours,
   getFeedbackMap,
   getOrCreateMatch,
   getPrefs,
@@ -42,6 +43,7 @@ export async function GET(req: Request) {
           menu: null,
           match: null,
           resolvedDate: date,
+          hours: getCafeHours(),
         });
       }
       const { items, combos, ...rest } = quick.match;
@@ -57,6 +59,7 @@ export async function GET(req: Request) {
         resolvedDate: date,
         cached: false,
         phase: "baseline",
+        hours: getCafeHours(),
       });
     }
 
@@ -72,6 +75,7 @@ export async function GET(req: Request) {
       timezone: searchParams.get("tz") || getPrefs(session.user.id)?.timezone,
       phase: "full",
       cached: Boolean(result.match),
+      hours: getCafeHours(),
     });
   } catch (err) {
     console.error(err);
@@ -119,6 +123,7 @@ export async function POST(req: Request) {
       feedback,
       timezone: body.tz || body.timezone || getPrefs(session.user.id)?.timezone,
       phase: "full",
+      hours: getCafeHours(),
     });
   } catch (err) {
     console.error(err);

@@ -143,10 +143,20 @@ function ensureSchema(sqlite: Database.Database) {
       provider_account_id TEXT NOT NULL,
       UNIQUE (provider, provider_account_id)
     );
+
+    CREATE TABLE IF NOT EXISTS cafe_settings (
+      id TEXT PRIMARY KEY,
+      breakfast_start TEXT NOT NULL DEFAULT '08:00',
+      breakfast_end TEXT NOT NULL DEFAULT '09:30',
+      lunch_start TEXT NOT NULL DEFAULT '11:30',
+      lunch_end TEXT NOT NULL DEFAULT '14:30',
+      updated_at TEXT NOT NULL
+    );
   `);
 
   migrateUsers(sqlite);
   migrateFeedback(sqlite);
+  seedCafeHours(sqlite);
 }
 
 function tableColumns(sqlite: Database.Database, table: string): Set<string> {
@@ -183,6 +193,20 @@ function migrateFeedback(sqlite: Database.Database) {
   if (!cols.has("note")) {
     sqlite.exec(`ALTER TABLE dish_feedback ADD COLUMN note TEXT NOT NULL DEFAULT ''`);
   }
+}
+
+function seedCafeHours(sqlite: Database.Database) {
+  const existing = sqlite
+    .prepare("SELECT id FROM cafe_settings WHERE id = ?")
+    .get("default") as { id: string } | undefined;
+  if (existing) return;
+  sqlite
+    .prepare(
+      `INSERT INTO cafe_settings (
+         id, breakfast_start, breakfast_end, lunch_start, lunch_end, updated_at
+       ) VALUES (?, '08:00', '09:30', '11:30', '14:30', ?)`
+    )
+    .run("default", new Date().toISOString());
 }
 
 function seedCafeAdmin(sqlite: Database.Database) {

@@ -21,6 +21,7 @@ import {
   StatPill,
 } from "@/components/ui";
 import { deviceTimeZone, todayOnDevice } from "@/lib/client-date";
+import { DEFAULT_CAFE_HOURS, type CafeHours } from "@/lib/meal-hours";
 
 type Tab = "overview" | "post" | "extract" | "team" | "preview" | "notes";
 
@@ -96,6 +97,8 @@ export default function AdminPage() {
     avoid: number;
     items: { name: string; decision: string; reason: string }[];
   } | null>(null);
+  const [hours, setHours] = useState<CafeHours>({ ...DEFAULT_CAFE_HOURS });
+  const [hoursSaving, setHoursSaving] = useState(false);
 
   const loadOverview = useCallback(async () => {
     const res = await fetch("/api/admin/overview");
@@ -151,6 +154,13 @@ export default function AdminPage() {
     setEmployees(data.users || []);
   }, []);
 
+  const loadHours = useCallback(async () => {
+    const res = await fetch("/api/admin/hours");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed");
+    if (data.hours) setHours(data.hours);
+  }, []);
+
   const refreshAll = useCallback(async (opts?: { soft?: boolean }) => {
     // Soft: no full-panel spinner when data already on screen
     if (!opts?.soft) setBooting(true);
@@ -161,13 +171,14 @@ export default function AdminPage() {
         loadExtract(date),
         loadTeam(),
         loadNotes(date),
+        loadHours(),
       ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
     } finally {
       setBooting(false);
     }
-  }, [date, loadExtract, loadOverview, loadTeam, loadNotes]);
+  }, [date, loadExtract, loadOverview, loadTeam, loadNotes, loadHours]);
 
   useEffect(() => {
     if (session?.user?.isAdmin) refreshAll();
@@ -315,6 +326,27 @@ export default function AdminPage() {
       setError(e instanceof Error ? e.message : "Failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveHours() {
+    setHoursSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/hours", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hours),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn’t save hours");
+      if (data.hours) setHours(data.hours);
+      setMessage("Service hours saved");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn’t save hours");
+    } finally {
+      setHoursSaving(false);
     }
   }
 
@@ -498,6 +530,105 @@ export default function AdminPage() {
               <StatPill label="Digest" value={overview.stats.digestOptIn} tone="mint" />
               <StatPill label="Days" value={overview.stats.menuDays} tone="butter" />
             </div>
+            <Card>
+              <h3 className="card-title">Service hours</h3>
+              <div className="mt-3 space-y-3">
+                <div>
+                  <p className="label">Breakfast</p>
+                  <div className="field-row-2">
+                    <div>
+                      <label className="label" htmlFor="hours-breakfast-start">
+                        From
+                      </label>
+                      <div className="field-shell">
+                        <input
+                          id="hours-breakfast-start"
+                          className="field field-native"
+                          type="time"
+                          value={hours.breakfastStart}
+                          onChange={(e) =>
+                            setHours({
+                              ...hours,
+                              breakfastStart: e.target.value || hours.breakfastStart,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="hours-breakfast-end">
+                        Until
+                      </label>
+                      <div className="field-shell">
+                        <input
+                          id="hours-breakfast-end"
+                          className="field field-native"
+                          type="time"
+                          value={hours.breakfastEnd}
+                          onChange={(e) =>
+                            setHours({
+                              ...hours,
+                              breakfastEnd: e.target.value || hours.breakfastEnd,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="label">Lunch</p>
+                  <div className="field-row-2">
+                    <div>
+                      <label className="label" htmlFor="hours-lunch-start">
+                        From
+                      </label>
+                      <div className="field-shell">
+                        <input
+                          id="hours-lunch-start"
+                          className="field field-native"
+                          type="time"
+                          value={hours.lunchStart}
+                          onChange={(e) =>
+                            setHours({
+                              ...hours,
+                              lunchStart: e.target.value || hours.lunchStart,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="hours-lunch-end">
+                        Until
+                      </label>
+                      <div className="field-shell">
+                        <input
+                          id="hours-lunch-end"
+                          className="field field-native"
+                          type="time"
+                          value={hours.lunchEnd}
+                          onChange={(e) =>
+                            setHours({
+                              ...hours,
+                              lunchEnd: e.target.value || hours.lunchEnd,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary !text-sm"
+                  disabled={hoursSaving || loading}
+                  onClick={() => void saveHours()}
+                >
+                  {hoursSaving ? "Saving…" : "Save hours"}
+                </button>
+              </div>
+            </Card>
             <Card>
               <h3 className="card-title">Recent</h3>
               <ul className="mt-2 divide-y divide-[var(--line)]">

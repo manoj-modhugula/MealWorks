@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Utensils } from "lucide-react";
 import {
   Alert,
@@ -20,6 +20,15 @@ import { PlateCarousel } from "@/components/plate-carousel";
 import { DishCard, type DishNote } from "@/components/dish-card";
 import { deviceTimeZone, todayOnDevice, withDeviceTz } from "@/lib/client-date";
 import { getCache, setCache } from "@/lib/client-cache";
+import {
+  DEFAULT_CAFE_HOURS,
+  MEAL_VIEWS,
+  defaultMealFromHours,
+  itemInMealView,
+  normalizeCafeHours,
+  type CafeHours,
+  type MealView,
+} from "@/lib/meal-hours";
 
 type MatchItem = {
   name: string;
@@ -86,6 +95,11 @@ export default function TodayPage() {
   const [filter, setFilter] = useState<
     "all" | "recommended" | "avoid" | "caution"
   >("recommended");
+  const [hours, setHours] = useState<CafeHours>(DEFAULT_CAFE_HOURS);
+  const [meal, setMeal] = useState<MealView>(() =>
+    defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS)
+  );
+  const mealTouched = useRef(false);
   const [feedback, setFeedback] = useState<Record<string, DishNote>>(
     cached0?.feedback ?? {}
   );
@@ -129,6 +143,13 @@ export default function TodayPage() {
     });
     if (data.feedback && typeof data.feedback === "object") {
       setFeedback(asDishNotes(data.feedback));
+    }
+    if (data.hours && typeof data.hours === "object") {
+      const nextHours = normalizeCafeHours(data.hours as Partial<CafeHours>);
+      setHours(nextHours);
+      if (!mealTouched.current) {
+        setMeal(defaultMealFromHours(new Date(), nextHours));
+      }
     }
   }, []);
 
@@ -248,19 +269,32 @@ export default function TodayPage() {
   }, [date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    mealTouched.current = false;
+    setMeal(defaultMealFromHours(new Date(), hours));
     setOpenNote(null);
-  }, [date, filter]);
+  }, [date]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const items = match?.payload?.items || [];
-  const recCount = items.filter((i) => i.decision === "recommended").length;
-  const avoidCount = items.filter((i) => i.decision === "avoid").length;
-  const maybeCount = items.filter((i) => i.decision === "caution").length;
+  useEffect(() => {
+    setOpenNote(null);
+  }, [date, filter, meal]);
+
+  const items = useMemo(() => match?.payload?.items || [], [match]);
+  const scoped = useMemo(
+    () => items.filter((i) => itemInMealView(i, meal)),
+    [items, meal]
+  );
+  const recCount = scoped.filter((i) => i.decision === "recommended").length;
+  const avoidCount = scoped.filter((i) => i.decision === "avoid").length;
+  const maybeCount = scoped.filter((i) => i.decision === "caution").length;
+  const dayRec = items.filter((i) => i.decision === "recommended").length;
+  const dayMaybe = items.filter((i) => i.decision === "caution").length;
+  const daySkip = items.filter((i) => i.decision === "avoid").length;
 
   const filtered = useMemo(() => {
-    return items.filter((i) =>
+    return scoped.filter((i) =>
       filter === "all" ? true : i.decision === filter
     );
-  }, [items, filter]);
+  }, [scoped, filter]);
 
   async function sendNote(dishName: string, stars: number, note: string) {
     if (!menu?.id) throw new Error("No menu today");
@@ -351,7 +385,7 @@ export default function TodayPage() {
                   {match.headline}
                 </h2>
                 <p className="mt-1.5 text-[0.9375rem] leading-snug text-[var(--muted)]">
-                  {recCount} good · {maybeCount} maybe · {avoidCount} skip
+                  {dayRec} good · {dayMaybe} maybe · {daySkip} skip
                 </p>
                 {polishing && (
                   <p className="mt-2 text-xs font-medium text-[var(--muted)]" role="status">
@@ -380,43 +414,63 @@ export default function TodayPage() {
             <PlateCarousel combos={match.payload.combos} />
           )}
 
-          <div
-            className="flex flex-wrap gap-1.5"
-            role="radiogroup"
-            aria-label="Filter"
-          >
-            {(
-              [
-                ["recommended", `Good ${recCount}`],
-                ["caution", `Maybe ${maybeCount}`],
-                ["avoid", `Skip ${avoidCount}`],
-                ["all", "All"],
-              ] as const
-            ).map(([id, text]) => (
-              <button
-                key={id}
-                type="button"
-                className="chip"
-                role="radio"
-                aria-checked={filter === id}
-                data-active={filter === id}
-                data-tone={
-                  id === "recommended"
-                    ? "good"
-                    : id === "avoid"
-                      ? "bad"
-                      : id === "caution"
-                        ? "maybe"
-                        : undefined
-                }
-                onClick={() => {
+          <div className="today-filter-row">
+            <div
+              className="today-filter-chips"
+              role="radiogroup"
+              aria-label="Filter"
+            >
+              {(
+                [
+                  ["recommended", `Good ${recCount}`],
+                  ["caution", `Maybe ${maybeCount}`],
+                  ["avoid", `Skip ${avoidCount}`],
+                  ["all", "All"],
+                ] as const
+              ).map(([id, text]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="chip"
+                  role="radio"
+                  aria-checked={filter === id}
+                  data-active={filter === id}
+                  data-tone={
+                    id === "recommended"
+                      ? "good"
+                      : id === "avoid"
+                        ? "bad"
+                        : id === "caution"
+                          ? "maybe"
+                          : undefined
+                  }
+                  onClick={() => {
+                    setOpenNote(null);
+                    setFilter(id);
+                  }}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+            <div className="today-meal-select">
+              <select
+                className="today-meal-select-face"
+                aria-label="Meal"
+                value={meal}
+                onChange={(e) => {
+                  mealTouched.current = true;
+                  setMeal(e.target.value as MealView);
                   setOpenNote(null);
-                  setFilter(id);
                 }}
               >
-                {text}
-              </button>
-            ))}
+                {MEAL_VIEWS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="card-grid-2">

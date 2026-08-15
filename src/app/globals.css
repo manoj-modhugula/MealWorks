@@ -193,6 +193,9 @@
     0 0 0 3px rgba(37, 99, 235, 0.2),
     0 4px 14px rgba(37, 99, 235, 0.12),
     0 10px 24px rgba(15, 23, 42, 0.08);
+  --meal-select-ring:
+    0 0 0 3px rgba(59, 122, 240, 0.4),
+    0 4px 14px rgba(59, 122, 240, 0.18);
 
   /* Secondary btn hover */
   --btn-secondary-hover-bg: rgba(255, 255, 255, 0.9);
@@ -474,6 +477,9 @@
     0 0 0 3px rgba(91, 156, 255, 0.28),
     0 4px 16px rgba(91, 156, 255, 0.15),
     0 10px 28px rgba(0, 0, 0, 0.35);
+  --meal-select-ring:
+    0 0 0 3px rgba(126, 176, 255, 0.46),
+    0 4px 16px rgba(126, 176, 255, 0.2);
 
   --btn-secondary-hover-bg: rgba(40, 46, 60, 0.9);
 
@@ -1088,6 +1094,88 @@ select.field {
 .glass-content .label {
   text-shadow: none;
   color: var(--ink-soft);
+}
+
+.today-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.today-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.today-filter-row .today-meal-select {
+  margin-left: auto;
+  width: auto;
+  min-width: 8.75rem;
+  max-width: 11rem;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--elevate-1), var(--meal-select-ring);
+  transition:
+    transform 0.14s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.14s ease;
+}
+
+.today-filter-row .today-meal-select:hover {
+  box-shadow: var(--elevate-2), var(--meal-select-ring);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .today-filter-row .today-meal-select:hover {
+    transform: translateY(-1px);
+  }
+  .today-filter-row .today-meal-select:active {
+    transform: translateY(1px);
+    box-shadow: var(--elevate-press), var(--meal-select-ring);
+  }
+}
+
+.today-meal-select-face {
+  display: block;
+  width: 100%;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--chrome-border);
+  border-top-color: var(--chrome-border-top);
+  border-bottom-color: var(--plane-border-bottom);
+  background-color: var(--glass-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%233a3a3c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M2.5 4.5 6 8 9.5 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.72rem center;
+  background-size: 0.72rem;
+  color: var(--ink-soft);
+  padding: 0.44rem 1.85rem 0.44rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 550;
+  cursor: pointer;
+  outline: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(16px) saturate(var(--glass-saturate));
+  backdrop-filter: blur(16px) saturate(var(--glass-saturate));
+}
+
+.today-meal-select-face:hover,
+.today-meal-select-face:focus,
+.today-meal-select-face:focus-visible {
+  background-color: var(--glass-bg-strong);
+  outline: none;
+  box-shadow: none;
+  border-color: var(--chrome-border);
+  border-top-color: var(--chrome-border-top);
+  border-bottom-color: var(--plane-border-bottom);
+}
+
+[data-theme="dark"] .today-meal-select-face {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%2393c5fd' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M2.5 4.5 6 8 9.5 4.5'/%3E%3C/svg%3E");
 }
 
 /* Chips (raised pills) */

@@ -138,3 +138,13 @@ export const dishFeedback = sqliteTable("dish_feedback", {
   note: text("note").notNull().default(""),
   createdAt: text("created_at").notNull(),
 });
+
+/** Singleton cafe service hours. One row, id = "default". */
+export const cafeSettings = sqliteTable("cafe_settings", {
+  id: text("id").primaryKey(),
+  breakfastStart: text("breakfast_start").notNull().default("08:00"),
+  breakfastEnd: text("breakfast_end").notNull().default("09:30"),
+  lunchStart: text("lunch_start").notNull().default("11:30"),
+  lunchEnd: text("lunch_end").notNull().default("14:30"),
+  updatedAt: text("updated_at").notNull(),
+});
