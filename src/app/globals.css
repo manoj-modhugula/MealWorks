@@ -100,6 +100,10 @@
     0 4px 8px rgba(15, 23, 42, 0.07),
     0 14px 32px rgba(15, 23, 42, 0.12),
     0 28px 56px rgba(15, 23, 42, 0.08);
+  --elevate-2-drop:
+    0 4px 8px rgba(15, 23, 42, 0.07),
+    0 14px 32px rgba(15, 23, 42, 0.12),
+    0 28px 56px rgba(15, 23, 42, 0.08);
   --elevate-3:
     0 2px 0 rgba(255, 255, 255, 0.95) inset,
     0 -1px 0 rgba(0, 0, 0, 0.08) inset,
@@ -376,6 +380,11 @@
     0 1.5px 0 rgba(255, 255, 255, 0.12) inset,
     0 -1px 0 rgba(0, 0, 0, 0.5) inset,
     0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 28px 56px rgba(0, 0, 0, 0.3);
+  --elevate-2-drop:
     0 0 0 1px rgba(255, 255, 255, 0.05),
     0 4px 12px rgba(0, 0, 0, 0.4),
     0 16px 40px rgba(0, 0, 0, 0.45),
@@ -2098,6 +2107,50 @@ select.field {
   font-variant-numeric: tabular-nums;
 }
 
+/* Clip the island, not the slot, so the drop glow can move with the cards. */
+.week-strip-slot {
+  overflow: visible;
+  min-height: 0;
+  pointer-events: none;
+  padding-bottom: 0;
+  transition: padding-bottom 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.week-strip-slot[data-open="true"] {
+  padding-bottom: 1.25rem;
+}
+.week-strip-slot[data-ready="true"][data-open="true"] {
+  pointer-events: auto;
+}
+.week-strip-slot[data-open="false"]:not([data-animating]) {
+  overflow: hidden;
+}
+.week-strip-slot:not([data-ready]) {
+  transition: none;
+}
+.week-strip-slot-clip {
+  overflow: hidden;
+  border-radius: 20px;
+  height: 0;
+  min-height: 0;
+  box-shadow: var(--elevate-2-drop);
+  transition: height 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.week-strip-slot:not([data-ready]) .week-strip-slot-clip {
+  transition: none;
+}
+.week-strip-slot-inner .week-strip {
+  margin-bottom: 0;
+  box-shadow:
+    0 1.5px 0 var(--chrome-border-top) inset,
+    0 -1px 0 var(--plane-border-bottom) inset;
+}
+@media (prefers-reduced-motion: reduce) {
+  .week-strip-slot,
+  .week-strip-slot-clip {
+    transition: none;
+  }
+}
+
 /* Date nav */
 .date-nav {
   display: inline-flex;
@@ -2112,6 +2165,9 @@ select.field {
   box-shadow: var(--elevate-2);
   -webkit-backdrop-filter: blur(16px) saturate(var(--glass-saturate));
   backdrop-filter: blur(16px) saturate(var(--glass-saturate));
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
 }
 
 .date-nav-value {

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import { DateNav } from "@/components/date-nav";
 import { WeekStrip } from "@/components/week-strip";
+import { WeekStripSlot } from "@/components/week-strip-slot";
 import { PlateCarousel } from "@/components/plate-carousel";
 import { DishCard, type DishNote } from "@/components/dish-card";
 import { deviceTimeZone, todayOnDevice, withDeviceTz } from "@/lib/client-date";
@@ -92,6 +93,7 @@ export default function TodayPage() {
     { date: string; score: number | null; hasMenu: boolean }[]
   >(cached0?.week ?? []);
   const [openNote, setOpenNote] = useState<string | null>(null);
+  const [weekOpen, setWeekOpen] = useState(false);
 
   const applyPayload = useCallback((data: Record<string, unknown>) => {
     const m = data.menu as {
@@ -297,6 +299,7 @@ export default function TodayPage() {
               date={date}
               onChange={setDate}
               maxDate={todayOnDevice()}
+              onHold={() => setWeekOpen((v) => !v)}
             />
             <button
               type="button"
@@ -312,7 +315,9 @@ export default function TodayPage() {
       />
 
       {week.length > 0 && (
-        <WeekStrip days={week} date={date} onChange={setDate} />
+        <WeekStripSlot open={weekOpen}>
+          <WeekStrip days={week} date={date} onChange={setDate} />
+        </WeekStripSlot>
       )}
 
       {loading && !match && !menu && <PageSkeleton rows={4} />}
