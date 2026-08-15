@@ -2,40 +2,56 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
+import { AnalogWatch } from "@/components/analog-watch";
+import { NoteDishPanel } from "@/components/note-dish-panel";
+import { PeopleRail } from "@/components/people-rail";
+import { PersonCard } from "@/components/person-card";
+import { Alert, Card, Page, PageHeader, Spinner } from "@/components/ui";
+import { DateNav } from "@/components/date-nav";
+import { todayOnDevice } from "@/lib/client-date";
 import {
-  Camera,
-  Eye,
-  LayoutDashboard,
-  MessageCircle,
-  Trash2,
-  Upload,
-  Users,
-} from "lucide-react";
+  ADMIN_ROOMS,
+  boardStatus,
+  canToggleAdmin,
+  emptyStarCounts,
+  isMenuUploadFile,
+  menuUploadKind,
+  roomShowsDate,
+  type AdminRoom,
+  type StarCounts,
+} from "@/lib/admin-view";
+import { formatAnalogLabel, parseHHMM } from "@/lib/analog-time";
 import {
-  Alert,
-  Card,
-  Page,
-  PageHeader,
-  Spinner,
-  StatPill,
-} from "@/components/ui";
-import { deviceTimeZone, todayOnDevice } from "@/lib/client-date";
-import { DEFAULT_CAFE_HOURS, type CafeHours } from "@/lib/meal-hours";
+  DEFAULT_CAFE_HOURS,
+  MEAL_VIEWS,
+  defaultMealFromHours,
+  itemInMealView,
+  type CafeHours,
+  type MealView,
+} from "@/lib/meal-hours";
 
-type Tab = "overview" | "post" | "extract" | "team" | "preview" | "notes";
+type HoursField = keyof CafeHours;
+
+const HOUR_FIELDS: {
+  key: HoursField;
+  meal: "Breakfast" | "Lunch";
+  bound: "From" | "Until";
+}[] = [
+  { key: "breakfastStart", meal: "Breakfast", bound: "From" },
+  { key: "breakfastEnd", meal: "Breakfast", bound: "Until" },
+  { key: "lunchStart", meal: "Lunch", bound: "From" },
+  { key: "lunchEnd", meal: "Lunch", bound: "Until" },
+];
 
 type NoteDish = {
   dishName: string;
+  meal: string;
+  station: string;
   count: number;
   avgStars: number | null;
-  notes: {
-    id: string;
-    userName: string;
-    stars: number | null;
-    note: string;
-    createdAt: string;
-  }[];
+  starCounts: StarCounts;
 };
 
 type FlatItem = {
@@ -46,78 +62,66 @@ type FlatItem = {
   tags: string[];
 };
 
-type Overview = {
-  today: string;
-  menu: { date: string; itemCount: number; matchCount: number; id?: string } | null;
-  stats: {
-    employees: number;
-    admins: number;
-    digestOptIn: number;
-    menuDays: number;
-  };
-  recentMenus: {
-    id: string;
-    date: string;
-    itemCount: number;
-    matchCount: number;
-  }[];
-};
-
 export default function AdminPage() {
   const { data: session } = useSession();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [room, setRoom] = useState<AdminRoom>("board");
   const [date, setDate] = useState(() => todayOnDevice());
-  const [deviceTz] = useState(() => deviceTimeZone());
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [stage, setStage] = useState("");
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [overview, setOverview] = useState<Overview | null>(null);
   const [flatItems, setFlatItems] = useState<FlatItem[]>([]);
   const [menuDayId, setMenuDayId] = useState<string | null>(null);
+  const [sourceImagePath, setSourceImagePath] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [employees, setEmployees] = useState<
-    { id: string; name: string; email: string; isAdmin: boolean }[]
+    {
+      id: string;
+      name: string;
+      email: string;
+      isAdmin: boolean;
+      isBlocked?: boolean;
+    }[]
   >([]);
-  const [previewDiet, setPreviewDiet] = useState("vegetarian");
-  const [previewAllergies, setPreviewAllergies] = useState("dairy");
+  const [openPersonId, setOpenPersonId] = useState<string | null>(null);
+  const [peopleDraft, setPeopleDraft] = useState("");
+  const [peopleQ, setPeopleQ] = useState("");
+  const [peoplePage, setPeoplePage] = useState(1);
+  const [peoplePageCount, setPeoplePageCount] = useState(1);
   const [newDish, setNewDish] = useState({
     name: "",
     meal: "lunch",
     station: "",
-    tags: "",
   });
   const [noteDishes, setNoteDishes] = useState<NoteDish[]>([]);
   const [openNoteDish, setOpenNoteDish] = useState<string | null>(null);
-  const [previewResult, setPreviewResult] = useState<{
-    score: number;
-    rec: number;
-    avoid: number;
-    items: { name: string; decision: string; reason: string }[];
-  } | null>(null);
+  const [noteMeal, setNoteMeal] = useState<MealView>(() =>
+    defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS)
+  );
+  const noteMealTouched = useRef(false);
   const [hours, setHours] = useState<CafeHours>({ ...DEFAULT_CAFE_HOURS });
   const [hoursSaving, setHoursSaving] = useState(false);
+  const [hourField, setHourField] = useState<HoursField>("breakfastStart");
+  const dateRef = useRef(date);
+  dateRef.current = date;
 
-  const loadOverview = useCallback(async () => {
-    const res = await fetch("/api/admin/overview");
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed");
-    setOverview(data);
-  }, []);
-
-  const loadExtract = useCallback(async (d: string) => {
+  const loadBoard = useCallback(async (d: string) => {
     const res = await fetch(`/api/admin/menus?date=${encodeURIComponent(d)}`);
+    if (dateRef.current !== d) return;
     if (res.status === 404) {
       setFlatItems([]);
       setMenuDayId(null);
+      setSourceImagePath(null);
       return;
     }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed");
     setMenuDayId(data.id);
-    // Prefer flatItems with ids
+    setSourceImagePath(data.sourceImagePath || null);
     if (data.flatItems) setFlatItems(data.flatItems);
     else {
       const flat: FlatItem[] = [];
@@ -143,67 +147,111 @@ export default function AdminPage() {
       `/api/admin/feedback?date=${encodeURIComponent(d)}`
     );
     const data = await res.json();
+    if (dateRef.current !== d) return;
     if (!res.ok) throw new Error(data.error || "Failed");
-    setNoteDishes(data.dishes || []);
+    setNoteDishes(
+      (data.dishes || []).map(
+        (d: Partial<NoteDish> & { dishName: string }) => ({
+          dishName: d.dishName,
+          meal: d.meal || "other",
+          station: d.station || "Other",
+          count: d.count || 0,
+          avgStars: d.avgStars ?? null,
+          starCounts: d.starCounts || emptyStarCounts(),
+        })
+      )
+    );
   }, []);
 
-  const loadTeam = useCallback(async () => {
-    const res = await fetch("/api/admin/users");
+  const loadPeople = useCallback(async () => {
+    const qs = new URLSearchParams({
+      page: String(peoplePage),
+      q: peopleQ,
+    });
+    const res = await fetch(`/api/admin/users?${qs}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed");
     setEmployees(data.users || []);
-  }, []);
+    setPeoplePageCount(data.pageCount || 1);
+    if (data.page && data.page !== peoplePage) setPeoplePage(data.page);
+  }, [peoplePage, peopleQ]);
 
   const loadHours = useCallback(async () => {
     const res = await fetch("/api/admin/hours");
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed");
-    if (data.hours) setHours(data.hours);
+    if (data.hours) {
+      setHours(data.hours);
+      if (!noteMealTouched.current) {
+        setNoteMeal(defaultMealFromHours(new Date(), data.hours));
+      }
+    }
   }, []);
 
-  const refreshAll = useCallback(async (opts?: { soft?: boolean }) => {
-    // Soft: no full-panel spinner when data already on screen
-    if (!opts?.soft) setBooting(true);
-    setError("");
-    try {
-      await Promise.all([
-        loadOverview(),
-        loadExtract(date),
-        loadTeam(),
-        loadNotes(date),
-        loadHours(),
-      ]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Load failed");
-    } finally {
-      setBooting(false);
-    }
-  }, [date, loadExtract, loadOverview, loadTeam, loadNotes, loadHours]);
+  const refreshAll = useCallback(
+    async (opts?: { soft?: boolean }) => {
+      if (!opts?.soft) setBooting(true);
+      setError("");
+      try {
+        await Promise.all([
+          loadBoard(date),
+          loadNotes(date),
+          loadHours(),
+        ]);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Load failed");
+      } finally {
+        setBooting(false);
+      }
+    },
+    [date, loadBoard, loadNotes, loadHours]
+  );
 
   useEffect(() => {
-    if (session?.user?.isAdmin) refreshAll();
+    if (session?.user?.isAdmin) void refreshAll();
     else setBooting(false);
     // Re-run only when admin session becomes available.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.isAdmin]);
 
   useEffect(() => {
-    if (!session?.user?.isAdmin) return;
-    if (tab === "extract" || tab === "preview") void loadExtract(date);
-    if (tab === "notes") {
-      setOpenNoteDish(null);
-      void loadNotes(date);
-    }
-  }, [date, tab, session?.user?.isAdmin, loadExtract, loadNotes]);
+    const t = window.setTimeout(() => {
+      const next = peopleDraft.trim();
+      if (next === peopleQ) return;
+      setPeopleQ(next);
+      setPeoplePage(1);
+      setOpenPersonId(null);
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [peopleDraft, peopleQ]);
 
   useEffect(() => {
-    if (tab !== "notes" || !openNoteDish) return;
+    if (!session?.user?.isAdmin) return;
+    void loadPeople().catch((e) =>
+      setError(e instanceof Error ? e.message : "Load failed")
+    );
+  }, [loadPeople, session?.user?.isAdmin]);
+
+  useEffect(() => {
+    if (!session?.user?.isAdmin) return;
+    setAdding(false);
+    setOpenNoteDish(null);
+    setFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    void loadBoard(date);
+    void loadNotes(date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, session?.user?.isAdmin, loadBoard, loadNotes]);
+
+  useEffect(() => {
+    if (room !== "notes" || !openNoteDish) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpenNoteDish(null);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, openNoteDish]);
+  }, [room, openNoteDish]);
 
   if (session && !session.user?.isAdmin) {
     return (
@@ -217,35 +265,38 @@ export default function AdminPage() {
   }
 
   function onFile(f: File | null) {
+    if (f && !isMenuUploadFile(f.name, f.type)) {
+      setError("Use a photo or a PDF.");
+      return;
+    }
+    setError("");
     setFile(f);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(f ? URL.createObjectURL(f) : null);
+    const kind = f ? menuUploadKind(f.name, f.type) : null;
+    setPreviewUrl(kind === "image" && f ? URL.createObjectURL(f) : null);
+    if (!f && fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function upload() {
     if (!file) {
-      setError("Choose a photo");
+      setError("Choose a file");
       return;
     }
+    if (menuDayId && !confirm("Replace the menu for this day?")) return;
     setLoading(true);
     setError("");
     setMessage("");
     try {
-      setStage("Uploading");
+      setStage("Reading menu");
       const form = new FormData();
       form.append("file", file);
       form.append("date", date);
-      setStage("Reading photo");
       const res = await fetch("/api/admin/menu", { method: "POST", body: form });
-      setStage("Structuring menu");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
-      setStage("Done");
-      setMessage(`Live · ${data.menu ? "extracted" : "saved"} for ${date}`);
-      setFile(null);
+      setMessage(`Live · ${data.menu ? "posted" : "saved"}`);
       onFile(null);
-      await refreshAll();
-      setTab("extract");
+      await refreshAll({ soft: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -254,30 +305,10 @@ export default function AdminPage() {
     }
   }
 
-  async function loadSample(useAi: boolean) {
-    setLoading(true);
-    setError("");
-    try {
-      setStage(useAi ? "AI sample…" : "Fixture…");
-      const res = await fetch("/api/admin/menu/sample", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, useAi }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      setMessage(`Sample ready for ${date}`);
-      await refreshAll();
-      setTab("extract");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed");
-    } finally {
-      setLoading(false);
-      setStage("");
-    }
-  }
-
-  async function patchItem(item: FlatItem, patch: Partial<FlatItem> & { delete?: boolean }) {
+  async function patchItem(
+    item: FlatItem,
+    patch: Partial<FlatItem> & { delete?: boolean }
+  ) {
     if (!menuDayId) return;
     setLoading(true);
     try {
@@ -288,40 +319,12 @@ export default function AdminPage() {
           menuDayId,
           itemId: item.id,
           name: patch.name,
-          tags: patch.tags,
           delete: patch.delete,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      await loadExtract(date);
-      setMessage("Menu updated · matches cleared");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function runPreview() {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/admin/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date,
-          dietType: previewDiet,
-          allergies: previewAllergies
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      setPreviewResult(data);
+      await loadBoard(date);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -342,12 +345,21 @@ export default function AdminPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn’t save hours");
       if (data.hours) setHours(data.hours);
-      setMessage("Service hours saved");
+      setMessage("Hours saved");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn’t save hours");
     } finally {
       setHoursSaving(false);
     }
+  }
+
+  async function toggleBlock(userId: string, blocked: boolean) {
+    const res = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, blocked }),
+    });
+    if (res.ok) await loadPeople();
   }
 
   async function toggleAdmin(userId: string, isAdmin: boolean) {
@@ -356,7 +368,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, isAdmin }),
     });
-    if (res.ok) await loadTeam();
+    if (res.ok) await loadPeople();
   }
 
   async function addDish() {
@@ -372,17 +384,13 @@ export default function AdminPage() {
           name: newDish.name,
           meal: newDish.meal,
           station: newDish.station || "Other",
-          tags: newDish.tags
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      setNewDish({ name: "", meal: newDish.meal, station: "", tags: "" });
-      await loadExtract(date);
-      setMessage("Dish added · matches cleared");
+      setNewDish({ name: "", meal: newDish.meal, station: "" });
+      setAdding(false);
+      await loadBoard(date);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -391,537 +399,308 @@ export default function AdminPage() {
   }
 
   async function deleteDay(d: string) {
-    if (!confirm(`Delete ${d}?`)) return;
+    if (!confirm("Delete this day's menu?")) return;
     await fetch(`/api/admin/menus?date=${encodeURIComponent(d)}`, {
       method: "DELETE",
     });
-    await refreshAll();
+    onFile(null);
+    setAdding(false);
+    await refreshAll({ soft: true });
   }
 
-  const tabs: { id: Tab; label: string; Icon: typeof LayoutDashboard }[] = [
-    { id: "overview", label: "Home", Icon: LayoutDashboard },
-    { id: "post", label: "Post", Icon: Upload },
-    { id: "extract", label: "Edit", Icon: Camera },
-    { id: "preview", label: "Preview", Icon: Eye },
-    { id: "notes", label: "Notes", Icon: MessageCircle },
-    { id: "team", label: "Team", Icon: Users },
-  ];
+  const hasMenu = Boolean(menuDayId);
+  const selfId = session?.user?.id || "";
+  const pendingKind = file ? menuUploadKind(file.name, file.type) : null;
+  const liveKind =
+    !file && sourceImagePath ? menuUploadKind(sourceImagePath) : null;
+  const wellImage =
+    pendingKind === "image"
+      ? previewUrl
+      : liveKind === "image"
+        ? sourceImagePath
+        : null;
+  const wellPdfName =
+    pendingKind === "pdf"
+      ? file?.name || "Menu.pdf"
+      : liveKind === "pdf"
+        ? sourceImagePath?.split("/").pop() || "Menu.pdf"
+        : null;
+  const wellEmpty = !wellImage && !wellPdfName;
+  const visibleNoteDishes = noteDishes.filter((d) =>
+    itemInMealView({ meal: d.meal, station: d.station }, noteMeal)
+  );
+  const noteMealLabel =
+    MEAL_VIEWS.find((m) => m.id === noteMeal)?.label || "this meal";
+  const openDish = noteDishes.find((d) => d.dishName === openNoteDish);
 
   return (
     <Page>
       <PageHeader
         title="Admin"
         action={
-          <button
-            type="button"
-            className="btn btn-secondary !text-sm"
-            onClick={() => refreshAll()}
-            disabled={loading || booting}
-          >
-            Refresh
-          </button>
+          roomShowsDate(room) ? (
+            <DateNav
+              date={date}
+              onChange={setDate}
+              maxDate={todayOnDevice()}
+            />
+          ) : null
         }
       />
 
-      <div className="mb-5 flex flex-wrap gap-1.5">
-        {tabs.map((t) => (
+      <div>
+      <div className="admin-rooms" role="tablist" aria-label="Admin">
+        {ADMIN_ROOMS.map((r) => (
           <button
-            key={t.id}
+            key={r.id}
             type="button"
-            className="nav-pill"
-            data-active={tab === t.id}
-            onClick={() => {
-              if (t.id === "notes" && overview?.menu?.date) {
-                setDate(overview.menu.date);
-              }
-              setTab(t.id);
-            }}
+            className="chip"
+            role="tab"
+            aria-selected={room === r.id}
+            data-active={room === r.id}
+            onClick={() => setRoom(r.id)}
           >
-            <t.Icon size={18} strokeWidth={2} />
-            {t.label}
+            {r.label}
           </button>
         ))}
       </div>
 
-      {message && <Alert tone="good">{message}</Alert>}
-      {error && (
-        <div className="mt-2">
-          <Alert tone="bad">{error}</Alert>
-        </div>
-      )}
-      {(loading || booting) && (
-        <div className="mt-2">
-          <Spinner label={stage || "Working…"} />
-        </div>
-      )}
+      <div className="mt-6 space-y-4">
+        {message && <Alert tone="good">{message}</Alert>}
+        {error && <Alert tone="bad">{error}</Alert>}
+        {(loading || booting) && <Spinner label={stage || "Working…"} />}
 
-      <div className="mt-4 space-y-4">
-        {(tab === "post" ||
-          tab === "extract" ||
-          tab === "preview" ||
-          tab === "notes") && (
-          <Card className="!p-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="min-w-0 max-w-xs flex-1 basis-[12rem]">
-                <label className="label">Date</label>
-                <div className="field-shell">
-                  <input
-                    className="field field-native"
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-secondary !text-sm"
-                onClick={() => setDate(todayOnDevice(deviceTz))}
-              >
-                Device today
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary !text-sm"
-                onClick={() => {
-                  void loadExtract(date);
-                  if (tab === "notes") void loadNotes(date);
-                }}
-              >
-                Load
-              </button>
-            </div>
-          </Card>
-        )}
-
-        {tab === "overview" && overview && (
+        {room === "board" && (
           <>
-            <Card>
-              <p className="card-title">
-                {overview.menu
-                  ? `Live · ${overview.menu.itemCount} on the board · ${overview.menu.date}`
-                  : "No menu for office today"}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => setTab("post")}
-                >
-                  Post menu
-                </button>
-                {overview.menu && (
+            <Card className="admin-board">
+              <div className="admin-board-head">
+                <h2 className="card-title">
+                  {boardStatus({ hasMenu, itemCount: flatItems.length })}
+                </h2>
+                {hasMenu && (
                   <button
                     type="button"
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      setDate(overview.menu!.date);
-                      setTab("extract");
-                    }}
+                    className="dish-flip-skip"
+                    onClick={() => void deleteDay(date)}
                   >
-                    Edit extraction
+                    Remove this day
                   </button>
                 )}
               </div>
-            </Card>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <StatPill label="People" value={overview.stats.employees} tone="lavender" />
-              <StatPill label="Admins" value={overview.stats.admins} tone="peach" />
-              <StatPill label="Digest" value={overview.stats.digestOptIn} tone="mint" />
-              <StatPill label="Days" value={overview.stats.menuDays} tone="butter" />
-            </div>
-            <Card>
-              <h3 className="card-title">Service hours</h3>
-              <div className="mt-3 space-y-3">
-                <div>
-                  <p className="label">Breakfast</p>
-                  <div className="field-row-2">
-                    <div>
-                      <label className="label" htmlFor="hours-breakfast-start">
-                        From
-                      </label>
-                      <div className="field-shell">
-                        <input
-                          id="hours-breakfast-start"
-                          className="field field-native"
-                          type="time"
-                          value={hours.breakfastStart}
-                          onChange={(e) =>
-                            setHours({
-                              ...hours,
-                              breakfastStart: e.target.value || hours.breakfastStart,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="label" htmlFor="hours-breakfast-end">
-                        Until
-                      </label>
-                      <div className="field-shell">
-                        <input
-                          id="hours-breakfast-end"
-                          className="field field-native"
-                          type="time"
-                          value={hours.breakfastEnd}
-                          onChange={(e) =>
-                            setHours({
-                              ...hours,
-                              breakfastEnd: e.target.value || hours.breakfastEnd,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <p className="label">Lunch</p>
-                  <div className="field-row-2">
-                    <div>
-                      <label className="label" htmlFor="hours-lunch-start">
-                        From
-                      </label>
-                      <div className="field-shell">
-                        <input
-                          id="hours-lunch-start"
-                          className="field field-native"
-                          type="time"
-                          value={hours.lunchStart}
-                          onChange={(e) =>
-                            setHours({
-                              ...hours,
-                              lunchStart: e.target.value || hours.lunchStart,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="label" htmlFor="hours-lunch-end">
-                        Until
-                      </label>
-                      <div className="field-shell">
-                        <input
-                          id="hours-lunch-end"
-                          className="field field-native"
-                          type="time"
-                          value={hours.lunchEnd}
-                          onChange={(e) =>
-                            setHours({
-                              ...hours,
-                              lunchEnd: e.target.value || hours.lunchEnd,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary !text-sm"
-                  disabled={hoursSaving || loading}
-                  onClick={() => void saveHours()}
-                >
-                  {hoursSaving ? "Saving…" : "Save hours"}
-                </button>
-              </div>
-            </Card>
-            <Card>
-              <h3 className="card-title">Recent</h3>
-              <ul className="mt-2 divide-y divide-[var(--line)]">
-                {overview.recentMenus.map((m) => (
-                  <li
-                    key={m.id}
-                    className="flex items-center justify-between gap-2 py-2 text-sm"
-                  >
-                    <span>
-                      <strong>{m.date}</strong> · {m.itemCount} posted
-                      {overview.menu?.id === m.id && overview.menu.itemCount > m.itemCount
-                        ? ` · ${overview.menu.itemCount} with salad bar`
-                        : ""}
-                    </span>
-                    <button
-                      type="button"
-                      className="icon-btn icon-btn-danger !h-8 !w-8"
-                      onClick={() => deleteDay(m.date)}
-                      aria-label="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          </>
-        )}
 
-        {tab === "post" && (
-          <>
-            <Card className="space-y-3">
-              <h2 className="card-title">Sample</h2>
-              <div className="flex flex-wrap gap-2">
+              <div
+                className="admin-board-stage"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) onFile(f);
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  id="board-file"
+                  type="file"
+                  accept="image/*,application/pdf,.heic,.heif,.pdf"
+                  className="sr-only"
+                  onChange={(e) => onFile(e.target.files?.[0] || null)}
+                />
+                {wellEmpty ? (
+                  <label className="admin-board-well" htmlFor="board-file">
+                    <span>Drop a photo or PDF</span>
+                  </label>
+                ) : (
+                  <div className="admin-board-well" data-filled="true">
+                    {wellImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={wellImage} alt="Menu" />
+                    ) : (
+                      <div className="admin-board-doc">
+                        <span className="admin-board-doc-kind">PDF</span>
+                        <span className="admin-board-doc-name">
+                          {wellPdfName}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="admin-board-actions">
+                <label className="chip" htmlFor="board-file">
+                  Choose file
+                </label>
+                {file && (
+                  <button
+                    type="button"
+                    className="dish-flip-skip"
+                    onClick={() => onFile(null)}
+                  >
+                    Clear
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={loading}
-                  onClick={() => loadSample(true)}
+                  disabled={loading || !file}
+                  onClick={() => void upload()}
                 >
-                  Sample + AI
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={loading}
-                  onClick={() => loadSample(false)}
-                >
-                  Fixture
+                  {hasMenu ? "Replace" : "Post"}
                 </button>
               </div>
             </Card>
-            <Card
-              className="space-y-3"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const f = e.dataTransfer.files?.[0];
-                if (f) onFile(f);
-              }}
-            >
-              <h2 className="card-title">Upload photo</h2>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="block w-full text-sm"
-                onChange={(e) => onFile(e.target.files?.[0] || null)}
-              />
-              {previewUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className="max-h-56 w-full rounded-xl object-contain bg-[var(--image-well)]"
-                />
-              )}
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={loading || !file}
-                onClick={upload}
-              >
-                Upload & extract
-              </button>
-            </Card>
-          </>
-        )}
 
-        {tab === "extract" && (
-          <Card>
-            <h2 className="card-title">
-              Extraction · {flatItems.length} dishes
-            </h2>
-            {menuDayId && (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <input
-                  className="field !py-1.5"
-                  placeholder="New dish name"
-                  value={newDish.name}
-                  onChange={(e) =>
-                    setNewDish((d) => ({ ...d, name: e.target.value }))
-                  }
-                />
-                <input
-                  className="field !py-1.5"
-                  placeholder="Station"
-                  value={newDish.station}
-                  onChange={(e) =>
-                    setNewDish((d) => ({ ...d, station: e.target.value }))
-                  }
-                />
-                <select
-                  className="field !py-1.5"
-                  value={newDish.meal}
-                  onChange={(e) =>
-                    setNewDish((d) => ({ ...d, meal: e.target.value }))
-                  }
-                >
-                  <option value="breakfast">breakfast</option>
-                  <option value="lunch">lunch</option>
-                  <option value="other">other</option>
-                </select>
-                <input
-                  className="field !py-1.5"
-                  placeholder="tags"
-                  value={newDish.tags}
-                  onChange={(e) =>
-                    setNewDish((d) => ({ ...d, tags: e.target.value }))
-                  }
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary sm:col-span-2"
-                  disabled={loading || !newDish.name.trim()}
-                  onClick={addDish}
-                >
-                  Add dish
-                </button>
-              </div>
-            )}
-            {flatItems.length === 0 ? (
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Nothing for this date. Post first.
-              </p>
-            ) : (
-              <ul className="mt-3 space-y-2">
+            {hasMenu && (
+              <Card>
+                <h2 className="card-title">Dishes</h2>
+                <div className="mt-3 space-y-2">
                 {flatItems.map((it) => (
-                  <li
-                    key={it.id}
-                    className="rounded-xl border border-[var(--line)] p-3"
-                  >
-                    <div className="flex flex-wrap gap-2">
+                  <div key={it.id} className="admin-dish">
+                    <div className="min-w-0 flex-1">
                       <input
                         className="field !py-1.5"
                         value={it.name}
+                        aria-label="Dish name"
                         onChange={(e) =>
                           setFlatItems((rows) =>
                             rows.map((r) =>
-                              r.id === it.id
-                                ? { ...r, name: e.target.value }
-                                : r
+                              r.id === it.id ? { ...r, name: e.target.value } : r
                             )
                           )
                         }
-                        onBlur={() => patchItem(it, { name: it.name })}
+                        onBlur={() => {
+                          if (it.name.trim()) patchItem(it, { name: it.name });
+                        }}
                       />
-                      <input
-                        className="field !py-1.5"
-                        value={it.tags.join(", ")}
-                        onChange={(e) =>
-                          setFlatItems((rows) =>
-                            rows.map((r) =>
-                              r.id === it.id
-                                ? {
-                                    ...r,
-                                    tags: e.target.value
-                                      .split(",")
-                                      .map((s) => s.trim())
-                                      .filter(Boolean),
-                                  }
-                                : r
-                            )
-                          )
-                        }
-                        onBlur={() => patchItem(it, { tags: it.tags })}
-                        placeholder="tags"
-                      />
+                      <p className="mt-1 text-xs text-[var(--muted)]">
+                        {it.meal} · {it.station}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="icon-btn icon-btn-danger !h-9 !w-9"
+                      onClick={() => patchItem(it, { delete: true })}
+                      aria-label="Delete dish"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+
+                {adding ? (
+                  <div className="admin-add">
+                    <input
+                      className="field !py-1.5"
+                      placeholder="Dish name"
+                      value={newDish.name}
+                      onChange={(e) =>
+                        setNewDish((d) => ({ ...d, name: e.target.value }))
+                      }
+                    />
+                    <select
+                      className="field !py-1.5"
+                      value={newDish.meal}
+                      onChange={(e) =>
+                        setNewDish((d) => ({ ...d, meal: e.target.value }))
+                      }
+                      aria-label="Meal"
+                    >
+                      <option value="breakfast">breakfast</option>
+                      <option value="lunch">lunch</option>
+                      <option value="other">other</option>
+                    </select>
+                    <input
+                      className="field !py-1.5"
+                      placeholder="Station"
+                      value={newDish.station}
+                      onChange={(e) =>
+                        setNewDish((d) => ({ ...d, station: e.target.value }))
+                      }
+                    />
+                    <div className="admin-quiet-row">
                       <button
                         type="button"
-                        className="icon-btn icon-btn-danger !h-9 !w-9"
-                        onClick={() => patchItem(it, { delete: true })}
-                        aria-label="Delete dish"
+                        className="btn btn-primary !py-1.5 !text-sm"
+                        disabled={loading || !newDish.name.trim()}
+                        onClick={() => void addDish()}
                       >
-                        <Trash2 size={14} />
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        className="dish-flip-skip"
+                        onClick={() => setAdding(false)}
+                      >
+                        Close
                       </button>
                     </div>
-                    <p className="mt-1 text-xs text-[var(--muted)]">
-                      {it.meal} · {it.station}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="dish-flip-skip"
+                    onClick={() => setAdding(true)}
+                  >
+                    Add dish
+                  </button>
+                )}
+                </div>
+              </Card>
             )}
-          </Card>
+          </>
         )}
 
-        {tab === "preview" && (
-          <Card className="space-y-3">
-            <h2 className="card-title">Preview as employee</h2>
-            <div className="field-row-2">
-              <div>
-                <label className="label">Diet</label>
+        {room === "notes" && (
+          <>
+            <div className="today-filter-row">
+              <div className="today-meal-select">
                 <select
-                  className="field"
-                  value={previewDiet}
-                  onChange={(e) => setPreviewDiet(e.target.value)}
+                  className="today-meal-select-face"
+                  aria-label="Meal"
+                  value={noteMeal}
+                  onChange={(e) => {
+                    noteMealTouched.current = true;
+                    setNoteMeal(e.target.value as MealView);
+                    setOpenNoteDish(null);
+                  }}
                 >
-                  <option value="vegan">Vegan</option>
-                  <option value="vegetarian">Vegetarian</option>
-                  <option value="eggetarian">Eggetarian</option>
-                  <option value="non_veg">Non-veg</option>
+                  {MEAL_VIEWS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
               </div>
-              <div>
-                <label className="label">Allergies (comma)</label>
-                <input
-                  className="field"
-                  value={previewAllergies}
-                  onChange={(e) => setPreviewAllergies(e.target.value)}
-                />
-              </div>
             </div>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={loading}
-              onClick={runPreview}
-            >
-              Run preview
-            </button>
-            {previewResult && (
-              <div className="mt-2 space-y-2 text-sm">
-                <p className="card-title">
-                  Fit {previewResult.score} · Good {previewResult.rec} · Skip{" "}
-                  {previewResult.avoid}
-                </p>
-                <ul className="max-h-64 space-y-1 overflow-auto">
-                  {previewResult.items.slice(0, 40).map((i) => (
-                    <li key={i.name}>
-                      <strong>{i.decision}</strong> {i.name}{" "}
-                      <span className="text-[var(--muted)]">: {i.reason}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </Card>
-        )}
-
-        {tab === "notes" && (
-          <>
-            {noteDishes.length === 0 ? (
+            {visibleNoteDishes.length === 0 ? (
               <Card>
                 <p className="text-sm text-[var(--muted)]">
-                  No notes for this day.
+                  No notes in {noteMealLabel}.
                 </p>
               </Card>
             ) : (
               <div className="card-grid-2">
-                {noteDishes.map((d) => (
+                {visibleNoteDishes.map((d) => (
                   <Card
                     key={d.dishName}
                     className="note-dish cursor-pointer !p-4"
                     role="button"
                     tabIndex={0}
-                    data-open={openNoteDish === d.dishName ? "true" : undefined}
-                    onClick={() =>
-                      setOpenNoteDish((cur) =>
-                        cur === d.dishName ? null : d.dishName
-                      )
-                    }
+                    onClick={() => setOpenNoteDish(d.dishName)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        setOpenNoteDish((cur) =>
-                          cur === d.dishName ? null : d.dishName
-                        );
+                        setOpenNoteDish(d.dishName);
                       }
                     }}
                   >
-                    <p className="card-title">{d.dishName}</p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
+                    <p className="font-semibold tracking-tight text-[var(--ink)]">
+                      {d.dishName}
+                    </p>
+                    <p className="mt-0.5 text-xs capitalize text-[var(--muted)]">
+                      {d.meal} · {d.station}
+                    </p>
+                    <p className="mt-1.5 text-sm leading-snug text-[var(--ink-soft)]">
                       {d.avgStars != null && (
                         <span className="dish-stars-read mr-2">
                           {"★".repeat(Math.round(d.avgStars))}
@@ -937,100 +716,130 @@ export default function AdminPage() {
               </div>
             )}
             {openNoteDish && (
-              <div className="note-stage mt-5 space-y-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="section-title">{openNoteDish}</p>
-                  <button
-                    type="button"
-                    className="dish-flip-skip"
-                    onClick={() => setOpenNoteDish(null)}
-                  >
-                    Close
-                  </button>
-                </div>
-                <div className="note-stack">
-                  {(
-                    noteDishes.find((d) => d.dishName === openNoteDish)?.notes ||
-                    []
-                  ).map((n, i) => (
-                    <Card
-                      key={n.id}
-                      className="note-slip note-slip-voice !p-4"
-                      style={{ animationDelay: `${i * 45}ms` }}
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="font-semibold text-[var(--ink)]">
-                          {n.userName}
-                        </p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {new Date(n.createdAt).toLocaleString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </div>
-                      {n.stars != null && (
-                        <p className="mt-1">
-                          <span className="dish-stars-read">
-                            {"★".repeat(n.stars)}
-                            <span className="dish-stars-off">
-                              {"★".repeat(5 - n.stars)}
-                            </span>
-                          </span>
-                        </p>
-                      )}
-                      {n.note ? (
-                        <p className="mt-2 text-sm leading-snug text-[var(--ink-soft)]">
-                          {n.note}
-                        </p>
-                      ) : (
-                        <p className="mt-2 text-sm text-[var(--muted)]">
-                          Just the stars.
-                        </p>
-                      )}
-                    </Card>
-                  ))}
-                </div>
-              </div>
+              <NoteDishPanel
+                dishName={openNoteDish}
+                date={date}
+                seedCounts={openDish?.starCounts}
+                seedAvg={openDish?.avgStars}
+                seedCount={openDish?.count}
+                onClose={() => setOpenNoteDish(null)}
+              />
             )}
           </>
         )}
 
-        {tab === "team" && (
-          <Card>
-            <h2 className="card-title">Team</h2>
-            <ul className="mt-3 divide-y divide-[var(--line)]">
-              {employees.map((u) => (
-                <li
-                  key={u.id}
-                  className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm"
-                >
-                  <div>
-                    <p className="font-bold">
-                      {u.name}
-                      {u.isAdmin ? " · admin" : ""}
-                    </p>
-                    <p className="text-[var(--muted)]">{u.email}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className={
-                      u.isAdmin
-                        ? "btn btn-danger !py-1.5 !text-xs"
-                        : "btn btn-secondary !py-1.5 !text-xs"
-                    }
-                    disabled={u.id === session?.user?.id}
-                    onClick={() => toggleAdmin(u.id, !u.isAdmin)}
-                  >
-                    {u.isAdmin ? "Remove admin" : "Make admin"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Card>
+        {room === "people" && (
+          <>
+            <div className="admin-people-tools">
+              <input
+                className="field"
+                value={peopleDraft}
+                onChange={(e) => setPeopleDraft(e.target.value)}
+                placeholder="Search people"
+                aria-label="Search people"
+              />
+            </div>
+            {employees.length === 0 ? (
+              <Card>
+                <p className="text-sm text-[var(--muted)]">
+                  {peopleQ ? "No people match." : "No people yet."}
+                </p>
+              </Card>
+            ) : (
+              <div className="admin-people">
+                {employees.map((u) => {
+                  const self = !canToggleAdmin({ targetId: u.id, selfId });
+                  return (
+                    <PersonCard
+                      key={u.id}
+                      person={u}
+                      self={self}
+                      open={openPersonId === u.id}
+                      onOpen={() => setOpenPersonId(u.id)}
+                      onClose={() => setOpenPersonId(null)}
+                      onToggleAdmin={() => toggleAdmin(u.id, !u.isAdmin)}
+                      onToggleBlock={() =>
+                        toggleBlock(u.id, !u.isBlocked)
+                      }
+                    />
+                  );
+                })}
+              </div>
+            )}
+            <PeopleRail
+              page={peoplePage}
+              pageCount={peoplePageCount}
+              onPage={(next) => {
+                setOpenPersonId(null);
+                setPeoplePage(next);
+              }}
+            />
+          </>
         )}
+
+        {room === "hours" && (
+          <>
+            <div className="admin-hours-layout">
+              {(["Breakfast", "Lunch"] as const).map((meal) => (
+                <Card
+                  key={meal}
+                  className={
+                    meal === "Breakfast"
+                      ? "admin-hours-breakfast"
+                      : "admin-hours-lunch"
+                  }
+                >
+                  <h2 className="card-title">{meal}</h2>
+                  <div className="admin-hours-stack">
+                    {HOUR_FIELDS.filter((f) => f.meal === meal).map((f) => {
+                      const t = parseHHMM(hours[f.key]);
+                      return (
+                        <button
+                          key={f.key}
+                          type="button"
+                          className="admin-hours-pick"
+                          data-active={hourField === f.key}
+                          aria-pressed={hourField === f.key}
+                          onClick={() => setHourField(f.key)}
+                        >
+                          <span>{f.bound}</span>
+                          <span className="admin-hours-pick-time">
+                            {t ? formatAnalogLabel(t) : hours[f.key]}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Card>
+              ))}
+              <Card className="admin-hours-dial">
+                <p className="card-title">
+                  {HOUR_FIELDS.find((f) => f.key === hourField)?.meal} ·{" "}
+                  {HOUR_FIELDS.find((f) => f.key === hourField)?.bound}
+                </p>
+                <AnalogWatch
+                  key={hourField}
+                  label={`${HOUR_FIELDS.find((f) => f.key === hourField)?.meal} ${HOUR_FIELDS.find((f) => f.key === hourField)?.bound}`}
+                  value={hours[hourField]}
+                  onChange={(next) =>
+                    setHours((cur) => ({ ...cur, [hourField]: next }))
+                  }
+                />
+              </Card>
+            </div>
+            <div className="admin-hours-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={hoursSaving || loading}
+                onClick={() => void saveHours()}
+              >
+                {hoursSaving ? "Saving…" : "Save hours"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
       </div>
     </Page>
   );

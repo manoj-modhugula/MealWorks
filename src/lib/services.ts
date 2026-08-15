@@ -6,7 +6,16 @@ import {
   extractMenuFromImage,
   interpretPreferences,
   matchMenuToPrefs,
+  summarizeDishNotes,
 } from "./agents";
+import { hasOpenRouterKey } from "./openrouter-ai";
+import {
+  addStar,
+  emptyStarCounts,
+  summaryCacheFresh,
+  toPublicNote,
+  type StarCounts,
+} from "./admin-view";
 import { interpretPreferencesLocal, matchMenuLocal } from "./matching";
 import type {
   AiInterpretation,
@@ -26,7 +35,11 @@ import { SAMPLE_MENU } from "./sample-menu";
 import { weekDatesMonFri } from "./dates";
 import { isEmailConfigured, sendEmail } from "./email";
 import { buildDigestEmail } from "./digest-email";
-import { mergeAlwaysOnStations } from "./salad-compose";
+import {
+  mergeAlwaysOnStations,
+  SALAD_COMPOSE_ITEMS,
+  SALAD_COMPOSE_STATION,
+} from "./salad-compose";
 import { compactSkipTerms } from "./profile-bio";
 import {
   DEFAULT_CAFE_HOURS,
@@ -328,6 +341,24 @@ export function getFeedbackMap(userId: string, menuDayId: string) {
   return map;
 }
 
+function isReviewRow(r: { stars: number | null; note: string }) {
+  return r.stars != null || Boolean(r.note.trim());
+}
+
+function dishMenuMeta(
+  dishName: string,
+  items: { name: string; meal: string; station: string }[]
+): { meal: string; station: string } {
+  const salad = SALAD_COMPOSE_ITEMS.find(
+    (i) => i.name.toLowerCase() === dishName.toLowerCase()
+  );
+  if (salad) return { meal: "lunch", station: SALAD_COMPOSE_STATION };
+  const hit = items.find(
+    (i) => i.name.toLowerCase() === dishName.toLowerCase()
+  );
+  return { meal: hit?.meal || "other", station: hit?.station || "Other" };
+}
+
 export function listMenuFeedback(menuDayId: string) {
   const db = getDb();
   const rows = db
@@ -335,43 +366,200 @@ export function listMenuFeedback(menuDayId: string) {
     .from(schema.dishFeedback)
     .where(eq(schema.dishFeedback.menuDayId, menuDayId))
     .all();
+  const items = db
+    .select()
+    .from(schema.menuItems)
+    .where(eq(schema.menuItems.menuDayId, menuDayId))
+    .all();
   const byDish = new Map<
     string,
     {
       dishName: string;
-      notes: {
-        id: string;
-        userName: string;
-        stars: number | null;
-        note: string;
-        createdAt: string;
-      }[];
+      meal: string;
+      station: string;
+      count: number;
+      starSum: number;
+      rated: number;
+      starCounts: StarCounts;
     }
   >();
   for (const r of rows) {
-    if (r.stars == null && !r.note) continue;
-    const user = getUserById(r.userId);
-    const entry = byDish.get(r.dishName) || { dishName: r.dishName, notes: [] };
-    entry.notes.push({
-      id: r.id,
-      userName: user?.name || "Someone",
-      stars: r.stars ?? null,
-      note: r.note || "",
-      createdAt: r.createdAt,
-    });
+    if (!isReviewRow(r)) continue;
+    const meta = dishMenuMeta(r.dishName, items);
+    const entry = byDish.get(r.dishName) || {
+      dishName: r.dishName,
+      meal: meta.meal,
+      station: meta.station,
+      count: 0,
+      starSum: 0,
+      rated: 0,
+      starCounts: emptyStarCounts(),
+    };
+    entry.count += 1;
+    if (r.stars != null) {
+      entry.rated += 1;
+      entry.starSum += r.stars;
+      entry.starCounts = addStar(entry.starCounts, r.stars);
+    }
     byDish.set(r.dishName, entry);
   }
   return Array.from(byDish.values())
-    .map((d) => {
-      d.notes.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-      const rated = d.notes.filter((n) => n.stars != null);
-      const avgStars =
-        rated.length > 0
-          ? rated.reduce((s, n) => s + (n.stars || 0), 0) / rated.length
-          : null;
-      return { ...d, count: d.notes.length, avgStars };
-    })
+    .map(({ starSum, rated, ...d }) => ({
+      ...d,
+      avgStars: rated > 0 ? starSum / rated : null,
+    }))
     .sort((a, b) => b.count - a.count || a.dishName.localeCompare(b.dishName));
+}
+
+function noteCursorOf(row: { createdAt: string; id: string }) {
+  return `${row.createdAt}|${row.id}`;
+}
+
+export function listDishNotes(opts: {
+  menuDayId: string;
+  dishName: string;
+  stars?: number | null;
+  cursor?: string | null;
+  limit?: number;
+}) {
+  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50);
+  const db = getDb();
+  const rows = db
+    .select()
+    .from(schema.dishFeedback)
+    .where(
+      and(
+        eq(schema.dishFeedback.menuDayId, opts.menuDayId),
+        eq(schema.dishFeedback.dishName, opts.dishName)
+      )
+    )
+    .all()
+    .filter(isReviewRow)
+    .sort((a, b) =>
+      a.createdAt < b.createdAt
+        ? 1
+        : a.createdAt > b.createdAt
+          ? -1
+          : a.id < b.id
+            ? 1
+            : -1
+    );
+
+  const starCounts = rows.reduce(
+    (c, r) => addStar(c, r.stars),
+    emptyStarCounts()
+  );
+  const rated = rows.filter((r) => r.stars != null);
+  const avgStars =
+    rated.length > 0
+      ? rated.reduce((s, r) => s + (r.stars || 0), 0) / rated.length
+      : null;
+
+  const filtered =
+    opts.stars != null && opts.stars >= 1 && opts.stars <= 5
+      ? rows.filter((r) => r.stars === opts.stars)
+      : rows;
+
+  let start = 0;
+  if (opts.cursor) {
+    const idx = filtered.findIndex((r) => noteCursorOf(r) === opts.cursor);
+    start = idx === -1 ? 0 : idx + 1;
+  }
+  const page = filtered.slice(start, start + limit);
+  const nextCursor =
+    start + limit < filtered.length && page.length > 0
+      ? noteCursorOf(page[page.length - 1])
+      : null;
+
+  return {
+    dishName: opts.dishName,
+    count: rows.length,
+    filteredCount: filtered.length,
+    avgStars,
+    starCounts,
+    notes: page.map((r) => toPublicNote(r)),
+    nextCursor,
+  };
+}
+
+export async function getDishNoteSummary(
+  menuDayId: string,
+  dishName: string
+): Promise<string | null> {
+  const db = getDb();
+  const written = db
+    .select()
+    .from(schema.dishFeedback)
+    .where(
+      and(
+        eq(schema.dishFeedback.menuDayId, menuDayId),
+        eq(schema.dishFeedback.dishName, dishName)
+      )
+    )
+    .all()
+    .filter((r) => r.note.trim())
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+
+  if (written.length === 0) return null;
+
+  const latestCreatedAt = written[0].createdAt;
+  const cached = db
+    .select()
+    .from(schema.dishNoteSummaries)
+    .where(
+      and(
+        eq(schema.dishNoteSummaries.menuDayId, menuDayId),
+        eq(schema.dishNoteSummaries.dishName, dishName)
+      )
+    )
+    .get();
+
+  if (
+    cached &&
+    summaryCacheFresh({
+      cachedCount: cached.noteCount,
+      cachedLatest: cached.latestCreatedAt,
+      noteCount: written.length,
+      latestCreatedAt,
+    })
+  ) {
+    return cached.sentence;
+  }
+
+  if (!hasOpenRouterKey()) return cached?.sentence || null;
+
+  try {
+    const sentence = await summarizeDishNotes(
+      dishName,
+      written.slice(0, 80).map((r) => r.note)
+    );
+    const now = nowISO();
+    db.insert(schema.dishNoteSummaries)
+      .values({
+        menuDayId,
+        dishName,
+        sentence,
+        noteCount: written.length,
+        latestCreatedAt,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.dishNoteSummaries.menuDayId,
+          schema.dishNoteSummaries.dishName,
+        ],
+        set: {
+          sentence,
+          noteCount: written.length,
+          latestCreatedAt,
+          updatedAt: now,
+        },
+      })
+      .run();
+    return sentence;
+  } catch {
+    return cached?.sentence || null;
+  }
 }
 
 /** Instant local match (no AI) for two-phase UI. */

@@ -142,7 +142,11 @@ export function fileToDataUrl(filePath: string) {
         ? "image/webp"
         : ext === ".gif"
           ? "image/gif"
-          : "image/jpeg";
+          : ext === ".pdf"
+            ? "application/pdf"
+            : ext === ".heic" || ext === ".heif"
+              ? "image/heic"
+              : "image/jpeg";
   return `data:${mime};base64,${buf.toString("base64")}`;
 }
 
@@ -176,6 +180,25 @@ function requireKey() {
   }
 }
 
+export async function summarizeDishNotes(
+  dishName: string,
+  notes: string[]
+): Promise<string> {
+  requireKey();
+  const lines = notes.map((n) => n.trim()).filter(Boolean);
+  if (lines.length === 0) throw new Error("No written notes");
+  const { data } = await orTextJson<{ summary: string }>(
+    `You write one short sentence that sums up cafeteria dish reviews for a cafe admin.
+Return ONLY JSON: {"summary":"..."}.
+Rules: one sentence, no names, no quotes of a single person, no medical claims.`,
+    `Dish: ${dishName}\nReviews:\n${lines.map((n) => `- ${n}`).join("\n")}`,
+    { maxTokens: 220 }
+  );
+  const sentence = String(data.summary || "").trim();
+  if (!sentence) throw new Error("empty summary");
+  return sentence;
+}
+
 export async function extractMenuFromImage(
   imagePathOrDataUrl: string,
   options?: { allowFixtureFallback?: boolean }
@@ -190,7 +213,7 @@ export async function extractMenuFromImage(
     throw new Error("OPENROUTER_API_KEY not set");
   }
 
-  const system = `You extract office cafeteria menus from photos.
+  const system = `You extract office cafeteria menus from photos or PDF menus.
 Return ONLY JSON:
 {
   "date": "YYYY-MM-DD or best guess",

@@ -81,7 +81,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .from(schema.users)
           .where(eq(schema.users.email, email))
           .get();
-        if (!user?.passwordHash || !user.emailVerifiedAt) return null;
+        if (!user?.passwordHash || !user.emailVerifiedAt || user.blockedAt)
+          return null;
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) return null;
         return {
@@ -162,9 +163,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .from(schema.users)
           .where(eq(schema.users.id, id))
           .get();
-        if (!row) {
+        if (!row || row.blockedAt) {
           // Only kill a session we already established.
-          if (token.email) return null;
+          if (token.email || row?.blockedAt) return null;
           return token;
         }
         token.isAdmin = Boolean(row.isAdmin);
