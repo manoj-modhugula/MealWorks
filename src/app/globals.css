@@ -2113,7 +2113,7 @@ select.field {
   min-height: 0;
   pointer-events: none;
   padding-bottom: 0;
-  transition: padding-bottom 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: padding-bottom 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .week-strip-slot[data-open="true"] {
   padding-bottom: 1.25rem;
@@ -2133,7 +2133,7 @@ select.field {
   height: 0;
   min-height: 0;
   box-shadow: var(--elevate-2-drop);
-  transition: height 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .week-strip-slot:not([data-ready]) .week-strip-slot-clip {
   transition: none;

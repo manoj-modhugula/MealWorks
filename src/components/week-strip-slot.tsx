@@ -8,8 +8,8 @@ import {
   type ReactNode,
 } from "react";
 
-/** Same curve as `.dish-flip-clip`; shorter so the page shift feels as snappy as a flip. */
-const SLOT_MS = 380;
+/** Fast ease-out so the island and score card move as one snap. */
+const SLOT_MS = 200;
 
 export function WeekStripSlot({
   open,
