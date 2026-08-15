@@ -113,14 +113,78 @@ function ensureSchema(sqlite: Database.Database) {
       ON match_results(user_id, menu_day_id);
     CREATE INDEX IF NOT EXISTS idx_feedback_user_menu
       ON dish_feedback(user_id, menu_day_id);
+
+    CREATE TABLE IF NOT EXISTS pending_signups (
+      email TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS email_otps (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      user_id TEXT,
+      purpose TEXT NOT NULL,
+      otp_hash TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_otp_email_purpose
+      ON email_otps(email, purpose);
+
+    CREATE TABLE IF NOT EXISTS oauth_accounts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL,
+      provider_account_id TEXT NOT NULL,
+      UNIQUE (provider, provider_account_id)
+    );
   `);
+
+  migrateUsers(sqlite);
+  migrateFeedback(sqlite);
+}
+
+function tableColumns(sqlite: Database.Database, table: string): Set<string> {
+  const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as {
+    name: string;
+  }[];
+  return new Set(rows.map((r) => r.name));
+}
+
+function migrateUsers(sqlite: Database.Database) {
+  const cols = tableColumns(sqlite, "users");
+  if (!cols.has("email_verified_at")) {
+    sqlite.exec(`ALTER TABLE users ADD COLUMN email_verified_at TEXT`);
+  }
+  // Grandfather existing rows so a 0.x office is not locked out.
+  sqlite
+    .prepare(
+      `UPDATE users SET email_verified_at = COALESCE(email_verified_at, created_at)
+       WHERE email_verified_at IS NULL`
+    )
+    .run();
 }
 
 /**
- * Ensures a known cafe-admin account exists for local development.
- * Password is reset to the seed value on each boot.
- * Override with ADMIN_EMAIL / ADMIN_PASSWORD.
+ * Ensures a known cafe-admin account exists.
+ * Password is only force-reset when ADMIN_RESET_ON_BOOT=1 (never in production
+ * unless that flag is set).
  */
+function migrateFeedback(sqlite: Database.Database) {
+  const cols = tableColumns(sqlite, "dish_feedback");
+  if (!cols.has("stars")) {
+    sqlite.exec(`ALTER TABLE dish_feedback ADD COLUMN stars INTEGER`);
+  }
+  if (!cols.has("note")) {
+    sqlite.exec(`ALTER TABLE dish_feedback ADD COLUMN note TEXT NOT NULL DEFAULT ''`);
+  }
+}
+
 function seedCafeAdmin(sqlite: Database.Database) {
   const { email, password, name } = SEED_ADMIN;
   if (!email || !password) return;
@@ -130,15 +194,14 @@ function seedCafeAdmin(sqlite: Database.Database) {
   const existing = sqlite
     .prepare("SELECT id FROM users WHERE email = ?")
     .get(email) as { id: string } | undefined;
-
   if (!existing) {
     const id = randomUUID();
     sqlite
       .prepare(
-        `INSERT INTO users (id, name, email, password_hash, is_admin, created_at)
-         VALUES (?, ?, ?, ?, 1, ?)`
+        `INSERT INTO users (id, name, email, password_hash, is_admin, email_verified_at, created_at)
+         VALUES (?, ?, ?, ?, 1, ?, ?)`
       )
-      .run(id, name, email, hash, now);
+      .run(id, name, email, hash, now, now);
     sqlite
       .prepare(
         `INSERT OR IGNORE INTO preference_profiles (
@@ -148,15 +211,28 @@ function seedCafeAdmin(sqlite: Database.Database) {
          ) VALUES (?, 'non_veg', '[]', '[]', '[]', '[]', '[]', '', 'Cafe admin account', 0, '07:00', 'Asia/Kolkata', 1, ?)`
       )
       .run(id, now);
-    console.log(`[seed] Cafe admin created: ${email}`);
-  } else {
+    console.log("[seed] Cafe admin created");
+    return;
+  }
+
+  if (process.env.ADMIN_RESET_ON_BOOT === "1") {
     sqlite
       .prepare(
-        `UPDATE users SET name = ?, password_hash = ?, is_admin = 1 WHERE email = ?`
+        `UPDATE users SET name = ?, password_hash = ?, is_admin = 1,
+         email_verified_at = COALESCE(email_verified_at, ?) WHERE email = ?`
       )
-      .run(name, hash, email);
-    console.log(`[seed] Cafe admin ready: ${email}`);
+      .run(name, hash, now, email);
+    console.log("[seed] Cafe admin password reset (ADMIN_RESET_ON_BOOT)");
+    return;
   }
+
+  sqlite
+    .prepare(
+      `UPDATE users SET name = ?, is_admin = 1,
+       email_verified_at = COALESCE(email_verified_at, ?) WHERE email = ?`
+    )
+    .run(name, now, email);
+  console.log("[seed] Cafe admin ready");
 }
 
 function createDb() {
@@ -186,6 +262,9 @@ export function getDb() {
     const { sqlite, db } = createDb();
     globalForDb.__mealworksSqlite = sqlite;
     globalForDb.__mealworksDb = db;
+  } else if (globalForDb.__mealworksSqlite) {
+    // Hot reload: still apply new columns/tables
+    ensureSchema(globalForDb.__mealworksSqlite);
   }
   return globalForDb.__mealworksDb!;
 }

@@ -19,7 +19,7 @@ export const AVOID_OPTIONS = [
   { value: "spicy", label: "Spicy" },
 ];
 
-/** Avoids already enforced by diet — hide from hard-avoid chips. */
+/** Avoids already enforced by diet. Hide from hard avoid chips. */
 const MEAT_FISH = ["pork", "beef", "chicken", "fish", "shellfish"] as const;
 const VEGAN_IMPLIED = [...MEAT_FISH, "egg", "dairy"] as const;
 
@@ -37,10 +37,38 @@ export function avoidOptionsForDiet(dietType: string) {
   return AVOID_OPTIONS.filter((o) => !hide.has(o.value));
 }
 
+/** Diet-implied chips to drop after a diet change. Extra freeform terms stay. */
+function impliedAvoidsForDiet(dietType: string): Set<string> {
+  if (dietType === "vegan") return new Set(VEGAN_IMPLIED);
+  if (dietType === "vegetarian" || dietType === "eggetarian") {
+    return new Set(MEAT_FISH);
+  }
+  return new Set();
+}
+
 /** Drop selected avoids that no longer apply after a diet change. */
 export function filterHardAvoidsForDiet(dietType: string, hardAvoids: string[]) {
-  const allowed = new Set(avoidOptionsForDiet(dietType).map((o) => o.value));
-  return hardAvoids.filter((v) => allowed.has(v));
+  const implied = impliedAvoidsForDiet(dietType);
+  return hardAvoids.filter((v) => !implied.has(v));
+}
+
+/** Allergen chips, not a second meat menu. */
+export const ALLERGY_OPTIONS = [
+  { value: "dairy", label: "Dairy" },
+  { value: "gluten", label: "Gluten" },
+  { value: "nuts", label: "Nuts" },
+  { value: "egg", label: "Egg" },
+  { value: "beans", label: "Beans" },
+  { value: "shellfish", label: "Shellfish" },
+];
+
+export function allergyOptionsForContext(
+  dietType: string,
+  hardAvoids: string[]
+) {
+  const hide = impliedAvoidsForDiet(dietType);
+  for (const a of hardAvoids) hide.add(a.toLowerCase());
+  return ALLERGY_OPTIONS.filter((o) => !hide.has(o.value));
 }
 
 export const GOAL_OPTIONS = [

@@ -4,9 +4,39 @@ export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  /** Empty string = OAuth-only (no password yet). */
+  passwordHash: text("password_hash").notNull().default(""),
   isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
+  emailVerifiedAt: text("email_verified_at"),
   createdAt: text("created_at").notNull(),
+});
+
+export const pendingSignups = sqliteTable("pending_signups", {
+  email: text("email").primaryKey(),
+  name: text("name").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const emailOtps = sqliteTable("email_otps", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  userId: text("user_id"),
+  purpose: text("purpose").notNull(),
+  otpHash: text("otp_hash").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+});
+
+export const oauthAccounts = sqliteTable("oauth_accounts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  providerAccountId: text("provider_account_id").notNull(),
 });
 
 export const preferenceProfiles = sqliteTable("preference_profiles", {
@@ -104,5 +134,7 @@ export const dishFeedback = sqliteTable("dish_feedback", {
   dishName: text("dish_name").notNull(),
   /** up | down | ate */
   vote: text("vote").notNull(),
+  stars: integer("stars"),
+  note: text("note").notNull().default(""),
   createdAt: text("created_at").notNull(),
 });

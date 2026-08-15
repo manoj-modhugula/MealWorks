@@ -27,8 +27,9 @@ import { weekDatesMonFri } from "./dates";
 import { isEmailConfigured, sendEmail } from "./email";
 import { buildDigestEmail } from "./digest-email";
 import { mergeAlwaysOnStations } from "./salad-compose";
+import { compactSkipTerms } from "./profile-bio";
 
-/** Invalidate only one user's matches (all days) — rare full reset. */
+/** Invalidate only one user's matches (all days). Rare full reset. */
 export function invalidateUserMatches(userId: string) {
   getDb()
     .delete(schema.matchResults)
@@ -125,11 +126,15 @@ export async function savePreferences(
 
   const next: PrefsInput = {
     dietType: (body.dietType as PrefsInput["dietType"]) || (existing.dietType as PrefsInput["dietType"]),
-    hardAvoids: body.hardAvoids ?? parseJsonArray(existing.hardAvoidsJson),
+    hardAvoids: compactSkipTerms(
+      body.hardAvoids ?? parseJsonArray(existing.hardAvoidsJson)
+    ),
     softDislikes: body.softDislikes ?? parseJsonArray(existing.softDislikesJson),
     likes: body.likes ?? parseJsonArray(existing.likesJson),
     goals: body.goals ?? parseJsonArray(existing.goalsJson),
-    allergies: body.allergies ?? parseJsonArray(existing.allergiesJson),
+    allergies: compactSkipTerms(
+      body.allergies ?? parseJsonArray(existing.allergiesJson)
+    ),
     freeformNotes:
       body.freeformNotes !== undefined ? body.freeformNotes : existing.freeformNotes,
   };
@@ -151,23 +156,6 @@ export async function savePreferences(
       // Should not throw (agents falls back locally); belt-and-suspenders
       console.error("[savePreferences] interpret failed", err);
       interpretation = interpretPreferencesLocal(next);
-    }
-    next.hardAvoids = uniqueStrings([
-      ...next.hardAvoids,
-      ...interpretation.hard_avoids,
-    ]);
-    next.allergies = uniqueStrings([
-      ...next.allergies,
-      ...interpretation.allergies,
-    ]);
-    next.softDislikes = uniqueStrings([
-      ...next.softDislikes,
-      ...interpretation.soft_dislikes,
-    ]);
-    next.likes = uniqueStrings([...next.likes, ...interpretation.likes]);
-    next.goals = uniqueStrings([...next.goals, ...interpretation.goals]);
-    if (interpretation.diet_type) {
-      next.dietType = interpretation.diet_type as PrefsInput["dietType"];
     }
     summary = interpretation.user_facing_summary;
   }
@@ -253,13 +241,25 @@ export function deleteTempRestriction(userId: string, id: string) {
   invalidateUserMatches(userId);
 }
 
+function voteFromStars(stars: number): "up" | "down" | "ate" {
+  if (stars >= 4) return "up";
+  if (stars <= 2) return "down";
+  return "ate";
+}
+
 export function upsertDishFeedback(input: {
   userId: string;
   menuDayId: string;
   dishName: string;
-  vote: "up" | "down" | "ate";
+  vote?: "up" | "down" | "ate";
+  stars?: number;
+  note?: string;
 }) {
   const db = getDb();
+  const stars = input.stars;
+  const vote =
+    stars != null ? voteFromStars(stars) : input.vote || "ate";
+  const note = (input.note || "").trim();
   const existing = db
     .select()
     .from(schema.dishFeedback)
@@ -273,18 +273,16 @@ export function upsertDishFeedback(input: {
     .get();
 
   if (existing) {
-    if (existing.vote === input.vote) {
-      // toggle off
-      db.delete(schema.dishFeedback)
-        .where(eq(schema.dishFeedback.id, existing.id))
-        .run();
-      return { vote: null as string | null };
-    }
     db.update(schema.dishFeedback)
-      .set({ vote: input.vote, createdAt: nowISO() })
+      .set({
+        vote,
+        stars: stars ?? existing.stars,
+        note: input.note !== undefined ? note : existing.note,
+        createdAt: nowISO(),
+      })
       .where(eq(schema.dishFeedback.id, existing.id))
       .run();
-    return { vote: input.vote };
+    return { vote, stars: stars ?? existing.stars, note: input.note !== undefined ? note : existing.note };
   }
 
   db.insert(schema.dishFeedback)
@@ -293,11 +291,13 @@ export function upsertDishFeedback(input: {
       userId: input.userId,
       menuDayId: input.menuDayId,
       dishName: input.dishName,
-      vote: input.vote,
+      vote,
+      stars: stars ?? null,
+      note,
       createdAt: nowISO(),
     })
     .run();
-  return { vote: input.vote };
+  return { vote, stars: stars ?? null, note };
 }
 
 export function getFeedbackMap(userId: string, menuDayId: string) {
@@ -311,9 +311,62 @@ export function getFeedbackMap(userId: string, menuDayId: string) {
       )
     )
     .all();
-  const map: Record<string, string> = {};
-  for (const r of rows) map[r.dishName] = r.vote;
+  const map: Record<string, { vote: string; stars: number | null; note: string }> =
+    {};
+  for (const r of rows) {
+    map[r.dishName] = {
+      vote: r.vote,
+      stars: r.stars ?? null,
+      note: r.note || "",
+    };
+  }
   return map;
+}
+
+export function listMenuFeedback(menuDayId: string) {
+  const db = getDb();
+  const rows = db
+    .select()
+    .from(schema.dishFeedback)
+    .where(eq(schema.dishFeedback.menuDayId, menuDayId))
+    .all();
+  const byDish = new Map<
+    string,
+    {
+      dishName: string;
+      notes: {
+        id: string;
+        userName: string;
+        stars: number | null;
+        note: string;
+        createdAt: string;
+      }[];
+    }
+  >();
+  for (const r of rows) {
+    if (r.stars == null && !r.note) continue;
+    const user = getUserById(r.userId);
+    const entry = byDish.get(r.dishName) || { dishName: r.dishName, notes: [] };
+    entry.notes.push({
+      id: r.id,
+      userName: user?.name || "Someone",
+      stars: r.stars ?? null,
+      note: r.note || "",
+      createdAt: r.createdAt,
+    });
+    byDish.set(r.dishName, entry);
+  }
+  return Array.from(byDish.values())
+    .map((d) => {
+      d.notes.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      const rated = d.notes.filter((n) => n.stars != null);
+      const avgStars =
+        rated.length > 0
+          ? rated.reduce((s, n) => s + (n.stars || 0), 0) / rated.length
+          : null;
+      return { ...d, count: d.notes.length, avgStars };
+    })
+    .sort((a, b) => b.count - a.count || a.dishName.localeCompare(b.dishName));
 }
 
 /** Instant local match (no AI) for two-phase UI. */
@@ -450,7 +503,12 @@ export function updateMenuItemRow(input: {
 
 export async function updateAccount(
   userId: string,
-  body: { name?: string; currentPassword?: string; newPassword?: string }
+  body: {
+    name?: string;
+    currentPassword?: string;
+    newPassword?: string;
+    otp?: string;
+  }
 ) {
   const user = getUserById(userId);
   if (!user) throw new Error("User not found");
@@ -462,9 +520,18 @@ export async function updateAccount(
       .run();
   }
   if (body.newPassword) {
-    if (!body.currentPassword) throw new Error("Current password required");
-    const ok = await bcrypt.compare(body.currentPassword, user.passwordHash);
-    if (!ok) throw new Error("Current password is wrong");
+    const { assertPasswordOk } = await import("./identity");
+    const pwErr = assertPasswordOk(body.newPassword, user.email);
+    if (pwErr) throw new Error(pwErr);
+    if (user.passwordHash) {
+      if (!body.currentPassword) throw new Error("Current password required");
+      const ok = await bcrypt.compare(body.currentPassword, user.passwordHash);
+      if (!ok) throw new Error("Current password is wrong");
+    }
+    if (!body.otp) throw new Error("Enter the email code to change your password");
+    const { verifyStepUp } = await import("./identity-account");
+    const otp = verifyStepUp(user.email, body.otp);
+    if (!otp.ok) throw new Error(otp.error);
     const hash = await bcrypt.hash(body.newPassword, 10);
     db.update(schema.users)
       .set({ passwordHash: hash })
@@ -472,6 +539,36 @@ export async function updateAccount(
       .run();
   }
   return getUserById(userId);
+}
+
+export function addMenuItemRow(input: {
+  menuDayId: string;
+  name: string;
+  meal: string;
+  station: string;
+  tags?: string[];
+}) {
+  const db = getDb();
+  const day = db
+    .select()
+    .from(schema.menuDays)
+    .where(eq(schema.menuDays.id, input.menuDayId))
+    .get();
+  if (!day) throw new Error("Menu day not found");
+  db.insert(schema.menuItems)
+    .values({
+      id: randomUUID(),
+      menuDayId: input.menuDayId,
+      name: input.name.trim(),
+      meal: input.meal.trim() || "lunch",
+      station: input.station.trim() || "Other",
+      tagsJson: JSON.stringify(uniqueStrings(input.tags || [])),
+    })
+    .run();
+  db.delete(schema.matchResults)
+    .where(eq(schema.matchResults.menuDayId, input.menuDayId))
+    .run();
+  return getMenuForDate(day.date);
 }
 
 /**
@@ -849,7 +946,7 @@ export function getMenuForDate(date: string) {
       return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
     });
 
-  // Always-on Salad Compose (not from photo) — available for match + employee menu
+  // Salad Compose is always on and is not from the photo.
   const structured = mergeAlwaysOnStations({
     date: day.date,
     meals,

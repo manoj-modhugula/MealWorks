@@ -39,13 +39,13 @@ describe("liquidPillAt multi-tab", () => {
 
   it("tracks finger across adjacent and multi-hop tabs", () => {
     const g = tabs();
-    // Past midpoint Today–Menu → Menu
+    // Past midpoint Today to Menu goes to Menu
     expect(liquidPillAt(g, 100)?.href).toBe("/menu");
-    // Past midpoint Menu–Prefs (two hops from Today) → Prefs
+    // Past midpoint Menu to Prefs (two hops from Today) goes to Prefs
     const mid = liquidPillAt(g, 190);
     expect(mid?.href).toBe("/preferences");
     expect(mid!.left).toBeGreaterThan(90);
-    // Past midpoint Prefs–Settings → Settings
+    // Past midpoint Prefs to Settings goes to Settings
     const far = liquidPillAt(g, 280);
     expect(far?.href).toBe("/settings");
     expect(far!.left).toBeGreaterThan(mid!.left);

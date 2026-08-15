@@ -10,6 +10,11 @@ import {
 } from "@/components/theme-provider";
 import { deviceTimeZone } from "@/lib/client-date";
 import { getCache, setCache } from "@/lib/client-cache";
+import {
+  SYSTEM_TZ,
+  systemTzLabel,
+  timezoneGroups,
+} from "@/lib/timezones";
 
 type SettingsCache = {
   name: string;
@@ -51,9 +56,14 @@ export default function SettingsPage() {
   );
   const [timezone, setTimezone] = useState(cached0?.timezone || "");
   const [deviceTz, setDeviceTz] = useState("");
+  const tzGroups = timezoneGroups();
   const [name, setName] = useState(cached0?.name || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [deleteOtp, setDeleteOtp] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [digest, setDigest] = useState<{
@@ -155,6 +165,20 @@ export default function SettingsPage() {
     else setError("Could not save");
   }
 
+  async function sendStepUp() {
+    setMessage("");
+    setError("");
+    setSendingCode(true);
+    try {
+      const res = await fetch("/api/identity/stepup", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) setError(data.error || "Could not send code");
+      else setMessage(data.message || "If this email can be used, we sent a code.");
+    } finally {
+      setSendingCode(false);
+    }
+  }
+
   async function saveAccount() {
     setMessage("");
     setError("");
@@ -165,6 +189,7 @@ export default function SettingsPage() {
         name,
         currentPassword: currentPassword || undefined,
         newPassword: newPassword || undefined,
+        otp: otp || undefined,
       }),
     });
     const data = await res.json();
@@ -175,6 +200,30 @@ export default function SettingsPage() {
     setMessage("Account updated");
     setCurrentPassword("");
     setNewPassword("");
+    setOtp("");
+  }
+
+  async function deleteAccount() {
+    setMessage("");
+    setError("");
+    if (
+      !window.confirm(
+        "Delete your MealWorks account and personal data? Menus posted for the office stay."
+      )
+    ) {
+      return;
+    }
+    const res = await fetch("/api/account", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ otp: deleteOtp, confirmEmail }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Could not delete");
+      return;
+    }
+    await signOut({ callbackUrl: "/" });
   }
 
   if (loading) {
@@ -198,9 +247,6 @@ export default function SettingsPage() {
           <Card className="settings-card">
             <div className="settings-card-head">
               <h2 className="card-title">Appearance</h2>
-              <p className="settings-card-desc">
-                System, fixed light or dark, or dark on a schedule.
-              </p>
             </div>
             <div className="settings-card-body">
               <div
@@ -276,9 +322,6 @@ export default function SettingsPage() {
           <Card className="settings-card">
             <div className="settings-card-head">
               <h2 className="card-title">Morning digest</h2>
-              <p className="settings-card-desc">
-                Email today’s fit, picks, and skips at a time you choose.
-              </p>
             </div>
             <div className="settings-card-body">
               <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold">
@@ -304,20 +347,42 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="label">Timezone</label>
-                  <input
-                    className="field"
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                  />
-                  {deviceTz && timezone !== deviceTz && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary mt-2 !py-1.5 !text-xs"
-                      onClick={() => setTimezone(deviceTz)}
+                  <div className="field-shell">
+                    <select
+                      className="field field-native"
+                      value={
+                        !timezone || timezone === deviceTz
+                          ? SYSTEM_TZ
+                          : timezone
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setTimezone(v === SYSTEM_TZ ? deviceTz : v);
+                      }}
                     >
-                      Use device timezone
-                    </button>
-                  )}
+                      <option value={SYSTEM_TZ}>
+                        {systemTzLabel(deviceTz)}
+                      </option>
+                      {timezone &&
+                        timezone !== deviceTz &&
+                        !tzGroups.some((g) =>
+                          g.zones.includes(timezone)
+                        ) && (
+                          <option value={timezone}>
+                            {timezone.replace(/_/g, " ")}
+                          </option>
+                        )}
+                      {tzGroups.map((g) => (
+                        <optgroup key={g.region} label={g.region}>
+                          {g.zones.map((z) => (
+                            <option key={z} value={z}>
+                              {z.replace(/_/g, " ")}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -339,7 +404,6 @@ export default function SettingsPage() {
           <Card className="settings-card">
             <div className="settings-card-head">
               <h2 className="card-title">Latest digest</h2>
-              <p className="settings-card-desc">Most recent message sent to you.</p>
             </div>
             <div className="settings-card-body">
               {!digest && (
@@ -381,9 +445,6 @@ export default function SettingsPage() {
           <Card className="settings-card">
             <div className="settings-card-head">
               <h2 className="card-title">Account</h2>
-              <p className="settings-card-desc">
-                Update your name or password. Slide the logo right to sign out.
-              </p>
             </div>
             <div className="settings-card-body">
               <div>
@@ -406,14 +467,41 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="label">New password</label>
+                  <label className="label">New password (10+)</label>
                   <input
                     className="field"
                     type="password"
+                    minLength={10}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     autoComplete="new-password"
                   />
+                </div>
+              </div>
+              <div>
+                <label className="label" htmlFor="account-otp">
+                  Email code
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    id="account-otp"
+                    className="field min-w-[8rem] flex-1 tracking-[0.2em]"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) =>
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={sendingCode}
+                    onClick={sendStepUp}
+                  >
+                    {sendingCode ? "Sending…" : "Send code"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -427,6 +515,49 @@ export default function SettingsPage() {
                 onClick={() => signOut({ callbackUrl: "/" })}
               >
                 Sign out
+              </button>
+            </div>
+          </Card>
+
+          <Card className="settings-card">
+            <div className="settings-card-head">
+              <h2 className="card-title">Delete account</h2>
+              <p className="settings-card-desc">
+                Removes your profile, prefs, and matches. Office menus stay.
+              </p>
+            </div>
+            <div className="settings-card-body">
+              <div>
+                <label className="label" htmlFor="delete-email">
+                  Type your email
+                </label>
+                <input
+                  id="delete-email"
+                  className="field"
+                  type="email"
+                  value={confirmEmail}
+                  onChange={(e) => setConfirmEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="delete-otp">
+                  Email code
+                </label>
+                <input
+                  id="delete-otp"
+                  className="field tracking-[0.2em]"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={deleteOtp}
+                  onChange={(e) =>
+                    setDeleteOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                />
+              </div>
+            </div>
+            <div className="settings-card-actions">
+              <button type="button" className="btn btn-danger" onClick={deleteAccount}>
+                Delete my account
               </button>
             </div>
           </Card>

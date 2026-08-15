@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { UtensilsCrossed } from "lucide-react";
 import { Alert, Card, Page } from "@/components/ui";
+import { OAuthButtons } from "@/components/oauth-buttons";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -32,14 +33,12 @@ function LoginForm() {
       const res = await signIn("credentials", {
         email: cleanEmail,
         password,
-        redirect: false,
+        callbackUrl: "/continue",
       });
-      if (!res || res.error || res.ok === false) {
+      if (res?.error) {
         setLoading(false);
         setError("Wrong email or password.");
-        return;
       }
-      window.location.assign("/continue");
     } catch {
       setLoading(false);
       setError("Sign-in failed. Try again.");
@@ -49,9 +48,6 @@ function LoginForm() {
   return (
     <Card className="mx-auto w-full max-w-md">
       <h1 className="page-title text-[1.75rem]">Welcome back</h1>
-      <p className="mt-1 text-sm text-[var(--muted)]">
-        Sign in for today’s personal menu.
-      </p>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <div>
           <label className="label" htmlFor="email">
@@ -89,6 +85,15 @@ function LoginForm() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      <p className="mt-3 text-center text-sm">
+        <Link
+          href="/forgot"
+          className="font-semibold text-[var(--accent)] underline-offset-2 hover:underline"
+        >
+          Forgot password
+        </Link>
+      </p>
+      <OAuthButtons label="Sign in" />
       <p className="mt-5 text-center text-sm text-[var(--muted)]">
         New?{" "}
         <Link

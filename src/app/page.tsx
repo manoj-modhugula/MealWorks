@@ -29,8 +29,7 @@ export default async function HomePage() {
             Know what to eat before you walk over.
           </h1>
           <p className="mt-5 max-w-md text-[1.075rem] leading-relaxed text-[var(--muted)]">
-            Your diet and allergies, matched to today’s board. Clear good and
-            skip — fast decisions.
+            Your diet and allergies, matched to today’s board.
           </p>
           <div className="mt-9 flex flex-wrap gap-2.5">
             <Link href="/register" className="btn btn-primary">
@@ -46,7 +45,7 @@ export default async function HomePage() {
               {
                 n: "01",
                 t: "Your taste",
-                d: "Diet, allergies, notes — in your words.",
+                d: "Diet, allergies, and notes in your words.",
                 Icon: Sparkles,
               },
               {

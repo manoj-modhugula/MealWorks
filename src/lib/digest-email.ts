@@ -30,7 +30,7 @@ function listText(
   return (
     `${title}\n` +
     slice
-      .map((i) => `  · ${i.name}${i.reason ? ` — ${i.reason}` : ""}`)
+      .map((i) => `  · ${i.name}${i.reason ? `: ${i.reason}` : ""}`)
       .join("\n") +
     "\n"
   );
@@ -50,7 +50,7 @@ function listHtml(
       (i) =>
         `<li style="margin:0 0 6px;"><strong>${escapeHtml(i.name)}</strong>${
           i.reason
-            ? ` <span style="color:#6e6e73;">— ${escapeHtml(i.reason)}</span>`
+            ? ` <span style="color:#6e6e73;">: ${escapeHtml(i.reason)}</span>`
             : ""
         }</li>`
     )
@@ -87,7 +87,7 @@ export function buildDigestEmail(opts: {
     listText("Skip", payload.avoid),
     `Open Today: ${todayUrl}`,
     ``,
-    `— MealWorks`,
+    `MealWorks`,
   ].join("\n");
 
   const html = `<!DOCTYPE html>

@@ -3,7 +3,22 @@ import { z } from "zod";
 export const registerSchema = z.object({
   name: z.string().trim().min(1).max(80),
   email: z.string().trim().email().max(120),
-  password: z.string().min(6).max(128),
+  password: z.string().min(10).max(128),
+});
+
+export const otpVerifySchema = z.object({
+  email: z.string().trim().email().max(120),
+  code: z.string().trim().regex(/^\d{6}$/),
+});
+
+export const resetConfirmSchema = z.object({
+  email: z.string().trim().email().max(120),
+  code: z.string().trim().regex(/^\d{6}$/),
+  newPassword: z.string().min(10).max(128),
+});
+
+export const emailOnlySchema = z.object({
+  email: z.string().trim().email().max(120),
 });
 
 export const prefsSchema = z
@@ -36,13 +51,29 @@ export const tempRestrictionSchema = z.object({
 export const feedbackSchema = z.object({
   menuDayId: z.string().min(1),
   dishName: z.string().trim().min(1).max(200),
-  vote: z.enum(["up", "down", "ate"]),
+  vote: z.enum(["up", "down", "ate"]).optional(),
+  stars: z.number().int().min(1).max(5).optional(),
+  note: z.string().trim().max(240).optional(),
 });
 
 export const accountUpdateSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   currentPassword: z.string().min(1).optional(),
-  newPassword: z.string().min(6).max(128).optional(),
+  newPassword: z.string().min(10).max(128).optional(),
+  otp: z.string().trim().regex(/^\d{6}$/).optional(),
+});
+
+export const accountDeleteSchema = z.object({
+  otp: z.string().trim().regex(/^\d{6}$/),
+  confirmEmail: z.string().trim().email().max(120),
+});
+
+export const menuItemCreateSchema = z.object({
+  menuDayId: z.string().min(1),
+  name: z.string().trim().min(1).max(200),
+  meal: z.string().trim().min(1).max(40).default("lunch"),
+  station: z.string().trim().min(1).max(80).default("Other"),
+  tags: z.array(z.string()).optional(),
 });
 
 export const menuItemPatchSchema = z.object({

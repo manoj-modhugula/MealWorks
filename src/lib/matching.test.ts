@@ -81,4 +81,68 @@ describe("matchMenuLocal", () => {
     const salad = r.items.find((i) => i.name === "Garden Salad");
     expect(salad?.decision).toBe("recommended");
   });
+
+  it("marks soft dislikes as caution", () => {
+    const r = matchMenuLocal(
+      menu,
+      { ...basePrefs, softDislikes: ["paneer"] },
+      []
+    );
+    const wrap = r.items.find((i) => i.name === "Paneer Wrap");
+    expect(wrap?.decision).toBe("caution");
+  });
+
+  it("boosts dishes that match likes", () => {
+    const r = matchMenuLocal(
+      menu,
+      { ...basePrefs, likes: ["falafel"] },
+      []
+    );
+    const fal = r.items.find((i) => i.name === "Falafel Bowl");
+    expect(fal?.decision).toBe("recommended");
+    expect(fal?.reason.toLowerCase()).toMatch(/like|goal/);
+  });
+
+  it("cautions spicy dishes when the goal is low spice", () => {
+    const spicyMenu: StructuredMenu = {
+      ...menu,
+      meals: [
+        {
+          type: "lunch",
+          stations: [
+            {
+              name: "Mains",
+              items: [{ name: "Chili Chicken", tags: ["chicken", "spicy"] }],
+            },
+          ],
+        },
+      ],
+    };
+    const r = matchMenuLocal(
+      spicyMenu,
+      { ...basePrefs, goals: ["low_spice"] },
+      []
+    );
+    expect(r.items[0]?.decision).toBe("caution");
+  });
+
+  it("does not skip from notes unless the term is a stored avoid", () => {
+    const r = matchMenuLocal(
+      menu,
+      { ...basePrefs, freeformNotes: "allergic to beans" },
+      []
+    );
+    const fal = r.items.find((i) => i.name === "Falafel Bowl");
+    expect(fal?.decision).toBe("recommended");
+  });
+
+  it("does not diet-block custom eaters", () => {
+    const r = matchMenuLocal(
+      menu,
+      { ...basePrefs, dietType: "custom" },
+      []
+    );
+    const ch = r.items.find((i) => i.name === "Grilled Chicken");
+    expect(ch?.decision).toBe("recommended");
+  });
 });

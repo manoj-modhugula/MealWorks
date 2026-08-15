@@ -1,22 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { Alert, Card, ChipGroup, Page, PageHeader, Spinner } from "@/components/ui";
-import { TagInput } from "@/components/tag-input";
 import {
+  Alert,
+  Card,
+  ChipGroup,
+  ChoicePicks,
+  Page,
+  PageHeader,
+  Spinner,
+} from "@/components/ui";
+import {
+  allergyOptionsForContext,
   avoidOptionsForDiet,
   DIET_OPTIONS,
   filterHardAvoidsForDiet,
   GOAL_OPTIONS,
 } from "@/lib/pref-options";
+import { profileBio } from "@/lib/profile-bio";
 
 const steps = [
   { title: "How do you eat?", hint: "Closest fit is fine." },
   { title: "Hard avoids", hint: "We never recommend these." },
-  { title: "Allergies", hint: "Most important step." },
+  { title: "Allergies", hint: "Only what you’re allergic to." },
   { title: "Goals", hint: "Optional." },
   { title: "Anything else?", hint: "Free text is OK." },
-  { title: "Confirm", hint: "Check what we understood." },
+  { title: "All set?", hint: "One last look." },
 ];
 
 export default function OnboardingPage() {
@@ -56,11 +65,10 @@ export default function OnboardingPage() {
       setError(data.error || "Could not interpret");
       return;
     }
-    const interp = data.prefs?.aiInterpretation;
     setPreview({
       allergies: data.prefs?.allergies || allergies,
       hard_avoids: data.prefs?.hardAvoids || hardAvoids,
-      summary: data.prefs?.userFacingSummary || interp?.user_facing_summary || "",
+      summary: "",
     });
     setStep(5);
   }
@@ -101,19 +109,34 @@ export default function OnboardingPage() {
   }
 
   const meta = steps[step];
+  const skipList = preview
+    ? [...new Set([...preview.allergies, ...preview.hard_avoids])]
+    : [];
+  const bio = profileBio({
+    dietType,
+    skip: skipList,
+    notes,
+  });
   const avoidOptions = avoidOptionsForDiet(dietType);
+  const allergyOptions = allergyOptionsForContext(dietType, hardAvoids);
+  const skipped = hardAvoids.filter((v) =>
+    ["pork", "beef", "chicken", "fish", "shellfish"].includes(v)
+  );
+  const allergyHint =
+    skipped.length > 0
+      ? `You already skip ${skipped.join(", ")}.`
+      : meta.hint;
   const hardAvoidHint =
     dietType === "vegan" ||
     dietType === "vegetarian" ||
     dietType === "eggetarian"
-      ? "Only extras — we already skip dishes that don’t match your diet."
+      ? "Extra avoids on top of your diet."
       : meta.hint;
 
   return (
     <Page>
       <PageHeader
         title="Your profile"
-        subtitle="About a minute"
         action={
           <button type="button" className="btn btn-ghost !text-sm" onClick={skip}>
             Skip
@@ -133,7 +156,7 @@ export default function OnboardingPage() {
         </p>
         <h2 className="card-title mt-1 text-xl">{meta.title}</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          {step === 1 ? hardAvoidHint : meta.hint}
+          {step === 1 ? hardAvoidHint : step === 2 ? allergyHint : meta.hint}
         </p>
 
         <div className="mt-5">
@@ -150,14 +173,22 @@ export default function OnboardingPage() {
             />
           )}
           {step === 1 && (
-            <ChipGroup
+            <ChoicePicks
               options={avoidOptions}
               selected={hardAvoids}
               onChange={setHardAvoids}
+              allowCustom
+              customPlaceholder="Or type another"
             />
           )}
           {step === 2 && (
-            <TagInput value={allergies} onChange={setAllergies} placeholder="e.g. dairy, beans" />
+            <ChoicePicks
+              options={allergyOptions}
+              selected={allergies}
+              onChange={setAllergies}
+              allowCustom
+              customPlaceholder="Or type another"
+            />
           )}
           {step === 3 && (
             <ChipGroup options={GOAL_OPTIONS} selected={goals} onChange={setGoals} />
@@ -171,15 +202,11 @@ export default function OnboardingPage() {
             />
           )}
           {step === 5 && preview && (
-            <div className="space-y-3 text-sm">
-              <p className="font-semibold text-[var(--ink-soft)]">{preview.summary}</p>
-              <div>
-                <p className="text-xs font-bold uppercase text-[var(--muted)]">We will avoid</p>
-                <p className="mt-1">
-                  {[...new Set([...preview.allergies, ...preview.hard_avoids])].join(", ") ||
-                    "nothing extra"}
-                </p>
-              </div>
+            <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] px-5 py-4">
+              <p className="eyebrow">Your plate</p>
+              <p className="font-display mt-3 text-[1.15rem] leading-snug tracking-tight text-[var(--ink)]">
+                {bio}
+              </p>
             </div>
           )}
         </div>
@@ -234,7 +261,7 @@ export default function OnboardingPage() {
                 disabled={loading}
                 onClick={() => finish(false)}
               >
-                Fix allergies
+                Edit
               </button>
               <button
                 type="button"

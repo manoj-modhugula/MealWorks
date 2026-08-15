@@ -4,7 +4,6 @@ import Script from "next/script";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-/** Soft display serif — headlines with warmth */
 const fraunces = Fraunces({
   variable: "--font-display",
   subsets: ["latin"],
@@ -12,7 +11,6 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
-/** Friendly geometric sans — UI & body */
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
@@ -21,9 +19,8 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "MealWorks — Your café, made personal",
-  description:
-    "Personalized office cafeteria guidance from today’s menu photo and your food preferences.",
+  title: "MealWorks",
+  description: "Office café menu, matched to your diet.",
 };
 
 export const viewport: Viewport = {

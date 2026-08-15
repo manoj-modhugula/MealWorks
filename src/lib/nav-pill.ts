@@ -11,7 +11,7 @@ export type TabGeom = {
 export const DROPLET_STRETCH = 22;
 /** Squash Y while stretched (volume-ish) */
 export const DROPLET_SQUASH = 0.1;
-/** Base follow rate (0–1). Lower = more elastic pull */
+/** Base follow rate from 0 to 1. Lower is more elastic. */
 export const FOLLOW_LERP_BASE = 0.32;
 /** Cap when goal is far (multi-tab scrub) */
 export const FOLLOW_LERP_MAX = 0.72;
