@@ -5,11 +5,14 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { UtensilsCrossed } from "lucide-react";
 import { Alert, Card, Page } from "@/components/ui";
+import { OAuthButtons } from "@/components/oauth-buttons";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState<"form" | "otp">("form");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -23,22 +26,49 @@ export default function RegisterPage() {
       body: JSON.stringify({ name, email, password }),
     });
     const data = await res.json();
+    setLoading(false);
+    if (!res.ok) {
+      setError(data.error || "Could not create account");
+      return;
+    }
+    setStep("otp");
+  }
+
+  async function onVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    const res = await fetch("/api/register/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code }),
+    });
+    const data = await res.json();
     if (!res.ok) {
       setLoading(false);
-      setError(data.error || "Could not register");
+      setError(data.error || "That code didn’t work");
       return;
     }
     const login = await signIn("credentials", {
       email: email.trim().toLowerCase(),
       password,
-      redirect: false,
+      callbackUrl: "/continue",
     });
-    if (login?.error || login?.ok === false) {
+    if (login?.error) {
       setLoading(false);
-      setError("Account created. Please sign in.");
-      return;
+      setError("Account ready. Sign in to continue.");
     }
-    window.location.assign("/continue");
+  }
+
+  async function resend() {
+    setError("");
+    const res = await fetch("/api/register/resend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!res.ok) setError(data.error || "Couldn’t send the code. Try again.");
   }
 
   return (
@@ -52,55 +82,112 @@ export default function RegisterPage() {
         </Link>
       </div>
       <Card className="mx-auto w-full max-w-md">
-        <h1 className="page-title text-[1.75rem]">Join the table</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          One minute to set up. Free for your office.
-        </p>
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="label" htmlFor="name">
-              Name
-            </label>
-            <input
-              id="name"
-              className="field"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="email">
-              Work email
-            </label>
-            <input
-              id="email"
-              className="field"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="password">
-              Password (6+)
-            </label>
-            <input
-              id="password"
-              className="field"
-              type="password"
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          {error && <Alert tone="bad">{error}</Alert>}
-          <button className="btn btn-primary w-full" disabled={loading} type="submit">
-            {loading ? "Creating…" : "Continue"}
-          </button>
-        </form>
+        <h1 className="page-title text-[1.75rem]">
+          {step === "form" ? "Create account" : "Enter your code"}
+        </h1>
+        {step !== "form" && (
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Sent to {email.trim().toLowerCase()}.
+          </p>
+        )}
+
+        {step === "form" ? (
+          <form onSubmit={onSubmit} className="mt-6 space-y-4">
+            <div>
+              <label className="label" htmlFor="name">
+                Name
+              </label>
+              <input
+                id="name"
+                className="field"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoComplete="name"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="email">
+                Email
+              </label>
+              <input
+                id="email"
+                className="field"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="password">
+                Password
+              </label>
+              <input
+                id="password"
+                className="field"
+                type="password"
+                minLength={10}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+            </div>
+            {error && <Alert tone="bad">{error}</Alert>}
+            <button className="btn btn-primary w-full" disabled={loading} type="submit">
+              {loading ? "Creating…" : "Sign up"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={onVerify} className="mt-6 space-y-4">
+            <div>
+              <label className="label" htmlFor="code">
+                Code
+              </label>
+              <input
+                id="code"
+                className="field tracking-[0.3em]"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                required
+              />
+            </div>
+            {error && <Alert tone="bad">{error}</Alert>}
+            <button className="btn btn-primary w-full" disabled={loading} type="submit">
+              {loading ? "Checking…" : "Verify"}
+            </button>
+            <p className="text-center text-sm text-[var(--muted)]">
+              <button
+                type="button"
+                className="font-semibold text-[var(--accent)]"
+                disabled={loading}
+                onClick={resend}
+              >
+                Resend
+              </button>
+              {" · "}
+              <button
+                type="button"
+                className="font-semibold text-[var(--accent)]"
+                onClick={() => {
+                  setStep("form");
+                  setCode("");
+                  setError("");
+                }}
+              >
+                Different email
+              </button>
+            </p>
+          </form>
+        )}
+
+        {step === "form" && <OAuthButtons label="Sign up" />}
+
         <p className="mt-5 text-center text-sm text-[var(--muted)]">
           Have an account?{" "}
           <Link

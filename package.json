@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "email:test": "node --env-file=.env --experimental-strip-types src/lib/email-test-cli.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

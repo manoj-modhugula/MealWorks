@@ -14,11 +14,21 @@ export function isEmailConfigured() {
 }
 
 function fromAddress() {
-  return (
-    process.env.EMAIL_FROM?.trim() ||
-    process.env.SMTP_USER?.trim() ||
-    "MealWorks <noreply@localhost>"
-  );
+  const user = process.env.SMTP_USER?.trim();
+  const host = (process.env.SMTP_HOST || "").toLowerCase();
+  // iCloud only accepts the authenticated mailbox, often without a display name.
+  if (user && host.includes("mail.me.com")) return user;
+  const configured = process.env.EMAIL_FROM?.trim();
+  if (user && configured) {
+    const angle = configured.match(/<([^>]+)>/);
+    const configuredAddr = (angle?.[1] || configured).trim().toLowerCase();
+    if (configuredAddr !== user.toLowerCase()) {
+      return `MealWorks <${user}>`;
+    }
+  }
+  if (configured) return configured;
+  if (user) return `MealWorks <${user}>`;
+  return "MealWorks <noreply@localhost>";
 }
 
 function createTransport() {
@@ -36,7 +46,7 @@ function createTransport() {
     auth: {
       user: process.env.SMTP_USER!.trim(),
       // App passwords may be pasted with spaces/hyphens
-      pass: process.env.SMTP_PASS!.replace(/[\s-]+/g, ""),
+      pass: process.env.SMTP_PASS!.replace(/\s+/g, ""),
     },
   });
 }
@@ -57,6 +67,12 @@ export async function sendEmail(
 ): Promise<SendEmailResult> {
   if (!isEmailConfigured()) {
     return { ok: false, error: "Email not configured (set SMTP_* in .env)" };
+  }
+  const host = (process.env.SMTP_HOST || "").toLowerCase();
+  if (host.includes("mail.me.com")) {
+    console.warn(
+      "[email] iCloud SMTP often rejects OTP mail (HM108). Use smtp.gmail.com with a Gmail app password."
+    );
   }
   const to = input.to.trim().toLowerCase();
   if (!to || !to.includes("@")) {

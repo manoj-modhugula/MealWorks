@@ -7,6 +7,12 @@ import { runDueDigests } from "@/lib/services";
  */
 export async function POST(req: Request) {
   const secret = process.env.CRON_SECRET;
+  if (process.env.NODE_ENV === "production" && !secret) {
+    return NextResponse.json(
+      { error: "CRON_SECRET is required in production." },
+      { status: 503 }
+    );
+  }
   if (secret) {
     const h = req.headers.get("authorization") || "";
     if (h !== `Bearer ${secret}`) {
