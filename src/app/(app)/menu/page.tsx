@@ -168,11 +168,6 @@ export default function MenuPage() {
                 {st.alwaysOn && (
                   <p className="card-title mt-1 text-base">Salad Compose</p>
                 )}
-                {!st.alwaysOn && (
-                  <p className="mt-0.5 text-sm font-semibold text-[var(--ink)]">
-                    {st.name}
-                  </p>
-                )}
                 <ul className="mt-2">
                   {st.items.map((it) => (
                     <li key={it.name} className="dish-line">
