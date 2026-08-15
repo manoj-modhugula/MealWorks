@@ -284,9 +284,9 @@
     0 14px 36px rgba(0, 0, 0, 0.16),
     0 24px 48px rgba(0, 0, 0, 0.1);
   --plate-card-shadow-side:
-    0 1px 0 rgba(255, 255, 255, 0.75) inset,
-    0 4px 14px rgba(0, 0, 0, 0.1),
-    0 12px 28px rgba(0, 0, 0, 0.08);
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    0 12px 28px rgba(0, 0, 0, 0.12),
+    0 18px 36px rgba(0, 0, 0, 0.08);
 
   /* Ambient canvas, depth for glass to sample */
   --bg-image:
@@ -560,9 +560,9 @@
     0 16px 40px rgba(0, 0, 0, 0.55),
     0 28px 56px rgba(0, 0, 0, 0.4);
   --plate-card-shadow-side:
-    0 1px 0 rgba(255, 255, 255, 0.08) inset,
-    0 4px 16px rgba(0, 0, 0, 0.4),
-    0 12px 28px rgba(0, 0, 0, 0.35);
+    0 4px 14px rgba(0, 0, 0, 0.4),
+    0 12px 28px rgba(0, 0, 0, 0.45),
+    0 18px 36px rgba(0, 0, 0, 0.3);
 
   --bg-image:
     radial-gradient(1100px 560px at 14% -8%, rgba(59, 110, 200, 0.2) 0%, transparent 55%),
@@ -1759,7 +1759,7 @@ select.field {
 }
 
 .plate-carousel-stage {
-  --plate-pad: 1rem;
+  --plate-pad: 0.7rem;
   width: 100%;
   margin: 0;
   padding: var(--plate-pad) !important;
@@ -1777,7 +1777,7 @@ select.field {
 .plate-carousel-track {
   position: relative;
   width: 100%;
-  height: 10.25rem;
+  height: 8.75rem;
   overflow: hidden;
   border-radius: calc(var(--radius) - 4px);
   perspective: 900px;
@@ -1814,7 +1814,7 @@ select.field {
 }
 
 .plate-carousel-card-inner {
-  padding: 1rem;
+  padding: 0.7rem;
   text-align: left;
   height: 100%;
   min-height: 0;
@@ -1833,7 +1833,7 @@ select.field {
   justify-content: space-evenly;
   flex: 1;
   min-height: 0;
-  margin: 0.35rem 0 0;
+  margin: 0.2rem 0 0;
   font-size: 0.9375rem;
   color: var(--ink-soft);
 }
@@ -1848,16 +1848,20 @@ select.field {
 
 .plate-carousel-card.is-left {
   z-index: 3;
+  height: calc(100% - 10px);
   transform: translate(calc(-50% - 58%), -50%) scale(1) translateZ(-24px);
   opacity: 0.5;
-  filter: blur(2.5px);
+  filter: none;
+  box-shadow: var(--plate-card-shadow-side);
 }
 
 .plate-carousel-card.is-right {
   z-index: 3;
+  height: calc(100% - 10px);
   transform: translate(calc(-50% + 58%), -50%) scale(1) translateZ(-24px);
   opacity: 0.5;
-  filter: blur(2.5px);
+  filter: none;
+  box-shadow: var(--plate-card-shadow-side);
 }
 
 .plate-carousel-card.is-hidden {
@@ -1874,7 +1878,10 @@ select.field {
 
 .plate-carousel-card.is-left .plate-carousel-card-inner,
 .plate-carousel-card.is-right .plate-carousel-card-inner {
-  box-shadow: var(--plate-card-shadow-side) !important;
+  filter: blur(2.5px);
+  box-shadow:
+    0 1px 0 var(--chrome-border-top) inset,
+    0 -1px 0 var(--plane-border-bottom) inset !important;
 }
 
 .plate-carousel-controls {
