@@ -139,9 +139,11 @@ Prefs arrays and full match payloads are stored as JSON text for simplicity.
 
 ### Auth
 
-Register → bcrypt hash → user + empty preference profile.  
-Login → rate limit → bcrypt verify → JWT (`id`, `email`, `isAdmin`).  
-Seed admin on database open when env credentials are configured.
+Register stores a pending signup and emails a 6-digit OTP; the `users` row is created only after the code is confirmed.  
+Optional Google / Apple sign-in (provider-verified email, linked by address).  
+Login → rate limit → bcrypt verify (verified accounts only) → JWT (`id`, `email`, `isAdmin` refreshed from DB).  
+Password change, reset, and account delete require a fresh email OTP.  
+Seed admin on database open when env credentials are configured (password is not rewritten on every boot unless `ADMIN_RESET_ON_BOOT=1`).
 
 ### Menu publish
 
