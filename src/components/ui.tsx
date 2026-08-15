@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Reading column — never stretches to full monitor width. */
+/** Reading column. Never stretches to full monitor width. */
 export function Page({
   children,
   className,
@@ -54,10 +54,11 @@ export function PageHeader({
   );
 }
 
-export function Card({
+export const Card = ({
   children,
   className,
   tint,
+  ref,
   ...rest
 }: {
   children: React.ReactNode;
@@ -71,7 +72,9 @@ export function Card({
     | "peach"
     | "butter"
     | "sky";
-} & React.HTMLAttributes<HTMLDivElement>) {
+} & React.HTMLAttributes<HTMLDivElement> & {
+  ref?: React.Ref<HTMLDivElement>;
+}) => {
   const tintClass =
     tint === "warm"
       ? "card-tint-warm"
@@ -81,11 +84,15 @@ export function Card({
           ? `card-tint-${tint}`
           : undefined;
   return (
-    <div className={cn("card p-4 sm:p-5", tintClass, className)} {...rest}>
+    <div
+      ref={ref}
+      className={cn("card p-4 sm:p-5", tintClass, className)}
+      {...rest}
+    >
       {children}
     </div>
   );
-}
+};
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return <h2 className="section-title mb-2.5">{children}</h2>;
@@ -182,6 +189,60 @@ export function ChipGroup({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+export function ChoicePicks({
+  options,
+  selected,
+  onChange,
+  allowCustom = false,
+  customPlaceholder = "Or type another",
+}: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  allowCustom?: boolean;
+  customPlaceholder?: string;
+}) {
+  const [draft, setDraft] = useState("");
+  const extras = selected.filter(
+    (s) => !options.some((o) => o.value === s)
+  );
+  const merged = [
+    ...options,
+    ...extras.map((v) => ({
+      value: v,
+      label: v.charAt(0).toUpperCase() + v.slice(1),
+    })),
+  ];
+
+  function addCustom() {
+    const t = draft.trim().toLowerCase();
+    setDraft("");
+    if (!t || selected.includes(t)) return;
+    onChange([...selected, t]);
+  }
+
+  return (
+    <div className="space-y-3">
+      <ChipGroup options={merged} selected={selected} onChange={onChange} />
+      {allowCustom && (
+        <input
+          className="field"
+          value={draft}
+          placeholder={customPlaceholder}
+          aria-label={customPlaceholder}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              addCustom();
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -307,7 +368,7 @@ export function StatPill({
   );
 }
 
-/** Modern thin SVG arc score — Apple Fitness / Linear style. */
+/** Thin SVG arc score. */
 export function ScoreRing({
   score,
   label = "Fit",

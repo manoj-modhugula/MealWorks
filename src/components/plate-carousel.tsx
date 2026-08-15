@@ -39,7 +39,7 @@ function normalizeSlots(combos: PlateCard[]): PlateCard[] {
       items: [],
       why:
         title === "Salad bowl"
-          ? "Few salad toppings fit you today — check the bar"
+          ? "Few salad toppings fit today."
           : `Thin ${title.replace(" idea", "").toLowerCase()} options for you today`,
     };
   });
@@ -72,7 +72,9 @@ export function PlateCarousel({
 
   return (
     <div className="plate-carousel">
-      <p className="section-title px-1">Plate ideas</p>
+      <div className="px-1 mb-4">
+        <h2 className="card-title">Plate ideas</h2>
+      </div>
       <div
         className="plate-carousel-stage card"
         onTouchStart={(e) => {
@@ -114,7 +116,7 @@ export function PlateCarousel({
                       {c.why || "No strong picks today"}
                     </p>
                   ) : (
-                    <ul className="mt-2 space-y-1 text-[0.9375rem] text-[var(--ink-soft)]">
+                    <ul className="plate-carousel-picks">
                       {c.items.map((name) => (
                         <li key={name}>{name}</li>
                       ))}

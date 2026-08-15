@@ -36,8 +36,8 @@ const baseLinks = [
 ];
 
 /** Logo drag-to-sign-out */
-const ACTIVATE_PX = 10;
-const HOLD_HINT_MS = 90;
+const ACTIVATE_PX = 8;
+const TAP_MS = 220;
 const COMMIT_RATIO = 0.5;
 const ARMED_RATIO = 0.86;
 const FLICK_VELOCITY = 0.55;
@@ -51,7 +51,7 @@ const EASE_SNAP = "cubic-bezier(0.22, 1.12, 0.36, 1)";
  */
 const SCRUB_ACTIVATE_PX = 14;
 const SCRUB_AXIS_RATIO = 1.25; // |dx| must beat |dy| * this
-/** Settle onto a tab after release — springy / overshoot */
+/** Settle onto a tab after release. */
 const PILL_EASE = "cubic-bezier(0.22, 1.4, 0.36, 1)";
 const PILL_MS = 380;
 
@@ -94,6 +94,7 @@ export function AppNav() {
     lastT: 0,
     velocity: 0,
     pointerId: -1,
+    startT: 0,
   });
 
   const [offset, setOffset] = useState(0);
@@ -333,14 +334,12 @@ export function AppNav() {
       }
 
       if (!wasScrubbing) {
-        // Pending only (tap / long-press without drag) — leave Link alone
         return;
       }
 
       // Block the synthetic click that follows pointerup
       s.suppressClickUntil = performance.now() + 450;
 
-      // Fresh measure + finger position — never stick to scrub-start tab
       const geoms = measureTabs();
       let target = s.targetHref || routeActiveRef.current;
       if (nav && opts.clientX != null) {
@@ -513,20 +512,14 @@ export function AppNav() {
       lastT: now,
       velocity: 0,
       pointerId: e.pointerId,
+      startT: now,
     };
     setOffset(0);
     setNearEnd(false);
     setSpringing(false);
     setSnapDir("idle");
-    setHolding(false);
     setDragging(false);
-
-    holdTimerRef.current = window.setTimeout(() => {
-      holdTimerRef.current = null;
-      if (dragRef.current.active && !done) {
-        enterHoldPreview(track);
-      }
-    }, HOLD_HINT_MS);
+    enterHoldPreview(track);
 
     try {
       logo.setPointerCapture(e.pointerId);
@@ -557,7 +550,10 @@ export function AppNav() {
       setDragging(true);
     }
 
-    paintOffset(Math.max(0, Math.min(d.maxX, dx)), d.maxX);
+    let next = dx;
+    if (next > d.maxX) next = d.maxX + (next - d.maxX) * 0.16;
+    next = Math.max(0, next);
+    paintOffset(next, d.maxX);
   };
 
   const onLogoPointerUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
@@ -576,14 +572,13 @@ export function AppNav() {
       }
     }
 
-    if (!d.dragging && !d.holding) {
-      d.active = false;
-      setHolding(false);
-      router.push("/today");
-      return;
-    }
-
-    if (!d.dragging && d.holding) {
+    if (!d.dragging) {
+      const quick = performance.now() - d.startT < TAP_MS;
+      if (quick) {
+        resetDrag(false);
+        router.push("/today");
+        return;
+      }
       resetDrag(true);
       return;
     }
@@ -661,7 +656,6 @@ export function AppNav() {
         if (Math.abs(dx) < SCRUB_ACTIVATE_PX) return;
         // Prefer horizontal; ignore mostly-vertical (scroll / trackpad noise)
         if (Math.abs(dx) < Math.abs(dy) * SCRUB_AXIS_RATIO) {
-          // Abort pending — was not a horizontal scrub
           s.mode = "idle";
           s.pointerId = -1;
           detachWindowScrub();
@@ -728,18 +722,16 @@ export function AppNav() {
   };
 
   const progress = maxX > 0 ? Math.min(1, offset / maxX) : 0;
-  const signingOut = holding || dragging || done || springing;
+  const committing = done || (springing && snapDir === "out");
+  const signingOut = holding || dragging || committing;
   const showRed = nearEnd || done;
   const hintText = nearEnd
     ? "release to sign out"
     : "slide right to sign out";
 
-  const fillPct =
-    signingOut && progress > 0.001
-      ? progress * 100
-      : holding && !dragging
-        ? 6
-        : 0;
+  const fillPct = signingOut
+    ? Math.max(progress * 100, dragging || committing ? progress * 100 : 8)
+    : 0;
 
   const logoTransition = springing
     ? `transform ${SNAP_MS}ms ${EASE_SNAP}`

@@ -11,7 +11,7 @@ export const OFFICE_TIMEZONE =
 
 /**
  * Calendar YYYY-MM-DD in a given IANA timezone.
- * Never use bare `toISOString().slice(0,10)` for "today" — that is always UTC
+ * Never use bare `toISOString().slice(0,10)` for "today". That is always UTC.
  * and will disagree with the user's phone/laptop clock near midnight.
  */
 export function todayISO(date = new Date(), timeZone = OFFICE_TIMEZONE) {

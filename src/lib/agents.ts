@@ -95,7 +95,7 @@ function buildCombos(items: MatchPayload["items"]): MatchPayload["combos"] {
       filter: (i) =>
         i.station === "Salad Compose" && i.decision === "recommended",
       max: 3,
-      empty: "Few salad toppings fit you today — check the bar",
+      empty: "Few salad toppings fit today.",
     },
   ];
 
@@ -522,7 +522,7 @@ RULES:
   } catch (err) {
     const detail = friendlyOpenRouterError(err);
     console.error("[matchMenuToPrefs] AI polish failed, using baseline", detail);
-    // Clean baseline only — never append raw parse errors to summary
+    // Never append raw parse errors to the summary.
     return withMeta(baseline, "baseline", "openrouter", {
       ok: false,
       detail,

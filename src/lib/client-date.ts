@@ -1,6 +1,6 @@
 /**
  * Browser-only date helpers. Uses the device IANA timezone automatically
- * (e.g. America/Los_Angeles, Asia/Kolkata) via the Intl API — no hardcoding.
+ * Uses the Intl API (America/Los_Angeles, Asia/Kolkata). No hardcoded zone.
  */
 
 import { todayISO } from "./utils";

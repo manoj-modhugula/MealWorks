@@ -7,10 +7,34 @@ export function addDaysISO(date: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-export function weekdayShort(date: string): string {
+function utcDate(date: string) {
   const [y, m, d] = date.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+export function weekdayShort(date: string): string {
+  return utcDate(date).toLocaleDateString("en-US", {
+    weekday: "short",
+    timeZone: "UTC",
+  });
+}
+
+export function weekdayLong(date: string): string {
+  return utcDate(date).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** Compact chrome label, e.g. "Aug 11". */
+export function formatMonthDay(date: string): string {
+  return utcDate(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 /** Monday of the week containing `date` (UTC calendar). */

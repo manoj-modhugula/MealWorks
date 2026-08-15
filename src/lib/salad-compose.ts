@@ -1,5 +1,5 @@
 /**
- * Always-on Salad Compose bar — not from daily photo extraction.
+ * Always on Salad Compose bar. Not from daily photo extraction.
  * Merged into every active menu for matching + display.
  */
 import type { MenuStation, StructuredMenu } from "./types";

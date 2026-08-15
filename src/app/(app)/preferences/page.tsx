@@ -5,12 +5,13 @@ import {
   Alert,
   Card,
   ChipGroup,
+  ChoicePicks,
   Page,
   PageHeader,
   PageSkeleton,
 } from "@/components/ui";
-import { TagInput } from "@/components/tag-input";
 import {
+  allergyOptionsForContext,
   avoidOptionsForDiet,
   DIET_OPTIONS,
   filterHardAvoidsForDiet,
@@ -76,7 +77,7 @@ export default function PreferencesPage() {
     if (!prefs) return;
     setSaving(true);
     setError("");
-    setMessage("Saved — refining…");
+    setMessage("Saved.");
     const snapshot = prefs;
     const res = await fetch("/api/preferences", {
       method: "PUT",
@@ -181,6 +182,11 @@ export default function PreferencesPage() {
         <div className="card-grid-2">
           <Card className="space-y-3">
             <h2 className="card-title">Diet</h2>
+            {prefs.dietType === "custom" && (
+              <p className="text-xs text-[var(--muted)]">
+                Custom uses only your allergies and avoids.
+              </p>
+            )}
             <ChipGroup
               multi={false}
               options={DIET_OPTIONS}
@@ -201,21 +207,50 @@ export default function PreferencesPage() {
 
           <Card className="space-y-3">
             <h2 className="card-title">Allergies</h2>
-            <TagInput
-              value={prefs.allergies}
+            <ChoicePicks
+              options={allergyOptionsForContext(
+                prefs.dietType,
+                prefs.hardAvoids
+              )}
+              selected={prefs.allergies}
               onChange={(allergies) => setPrefs({ ...prefs, allergies })}
+              allowCustom
+              customPlaceholder="Or type another"
             />
           </Card>
 
           <Card className="space-y-3">
             <h2 className="card-title">Hard avoids</h2>
-            <p className="text-xs text-[var(--muted)]">
-              Extras only — your diet already filters mismatched dishes.
-            </p>
-            <ChipGroup
+            <ChoicePicks
               options={avoidOptionsForDiet(prefs.dietType)}
               selected={prefs.hardAvoids}
               onChange={(hardAvoids) => setPrefs({ ...prefs, hardAvoids })}
+              allowCustom
+              customPlaceholder="Or type another"
+            />
+          </Card>
+
+          <Card className="space-y-3">
+            <h2 className="card-title">Likes</h2>
+            <ChoicePicks
+              options={[]}
+              selected={prefs.likes}
+              onChange={(likes) => setPrefs({ ...prefs, likes })}
+              allowCustom
+              customPlaceholder="e.g. salmon, tofu"
+            />
+          </Card>
+
+          <Card className="space-y-3">
+            <h2 className="card-title">Usually skip</h2>
+            <ChoicePicks
+              options={[]}
+              selected={prefs.softDislikes}
+              onChange={(softDislikes) =>
+                setPrefs({ ...prefs, softDislikes })
+              }
+              allowCustom
+              customPlaceholder="e.g. raw onion"
             />
           </Card>
 
@@ -270,7 +305,13 @@ export default function PreferencesPage() {
                 </div>
               </div>
             </div>
-            <TagInput value={tempTags} onChange={setTempTags} placeholder="Tags" />
+            <ChoicePicks
+              options={[]}
+              selected={tempTags}
+              onChange={setTempTags}
+              allowCustom
+              customPlaceholder="Or type a tag"
+            />
             <button
               type="button"
               className="btn btn-primary mt-1"

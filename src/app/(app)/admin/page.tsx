@@ -7,6 +7,7 @@ import {
   Camera,
   Eye,
   LayoutDashboard,
+  MessageCircle,
   Trash2,
   Upload,
   Users,
@@ -21,7 +22,20 @@ import {
 } from "@/components/ui";
 import { deviceTimeZone, todayOnDevice } from "@/lib/client-date";
 
-type Tab = "overview" | "post" | "extract" | "team" | "preview";
+type Tab = "overview" | "post" | "extract" | "team" | "preview" | "notes";
+
+type NoteDish = {
+  dishName: string;
+  count: number;
+  avgStars: number | null;
+  notes: {
+    id: string;
+    userName: string;
+    stars: number | null;
+    note: string;
+    createdAt: string;
+  }[];
+};
 
 type FlatItem = {
   id: string;
@@ -68,6 +82,14 @@ export default function AdminPage() {
   >([]);
   const [previewDiet, setPreviewDiet] = useState("vegetarian");
   const [previewAllergies, setPreviewAllergies] = useState("dairy");
+  const [newDish, setNewDish] = useState({
+    name: "",
+    meal: "lunch",
+    station: "",
+    tags: "",
+  });
+  const [noteDishes, setNoteDishes] = useState<NoteDish[]>([]);
+  const [openNoteDish, setOpenNoteDish] = useState<string | null>(null);
   const [previewResult, setPreviewResult] = useState<{
     score: number;
     rec: number;
@@ -113,6 +135,15 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadNotes = useCallback(async (d: string) => {
+    const res = await fetch(
+      `/api/admin/feedback?date=${encodeURIComponent(d)}`
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed");
+    setNoteDishes(data.dishes || []);
+  }, []);
+
   const loadTeam = useCallback(async () => {
     const res = await fetch("/api/admin/users");
     const data = await res.json();
@@ -125,20 +156,43 @@ export default function AdminPage() {
     if (!opts?.soft) setBooting(true);
     setError("");
     try {
-      await Promise.all([loadOverview(), loadExtract(date), loadTeam()]);
+      await Promise.all([
+        loadOverview(),
+        loadExtract(date),
+        loadTeam(),
+        loadNotes(date),
+      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
     } finally {
       setBooting(false);
     }
-  }, [date, loadExtract, loadOverview, loadTeam]);
+  }, [date, loadExtract, loadOverview, loadTeam, loadNotes]);
 
   useEffect(() => {
     if (session?.user?.isAdmin) refreshAll();
     else setBooting(false);
-    // Only re-run when admin session becomes available — not on every callback identity
+    // Re-run only when admin session becomes available.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.isAdmin]);
+
+  useEffect(() => {
+    if (!session?.user?.isAdmin) return;
+    if (tab === "extract" || tab === "preview") void loadExtract(date);
+    if (tab === "notes") {
+      setOpenNoteDish(null);
+      void loadNotes(date);
+    }
+  }, [date, tab, session?.user?.isAdmin, loadExtract, loadNotes]);
+
+  useEffect(() => {
+    if (tab !== "notes" || !openNoteDish) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpenNoteDish(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab, openNoteDish]);
 
   if (session && !session.user?.isAdmin) {
     return (
@@ -273,6 +327,37 @@ export default function AdminPage() {
     if (res.ok) await loadTeam();
   }
 
+  async function addDish() {
+    if (!menuDayId || !newDish.name.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/menu/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          menuDayId,
+          name: newDish.name,
+          meal: newDish.meal,
+          station: newDish.station || "Other",
+          tags: newDish.tags
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setNewDish({ name: "", meal: newDish.meal, station: "", tags: "" });
+      await loadExtract(date);
+      setMessage("Dish added · matches cleared");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function deleteDay(d: string) {
     if (!confirm(`Delete ${d}?`)) return;
     await fetch(`/api/admin/menus?date=${encodeURIComponent(d)}`, {
@@ -286,6 +371,7 @@ export default function AdminPage() {
     { id: "post", label: "Post", Icon: Upload },
     { id: "extract", label: "Edit", Icon: Camera },
     { id: "preview", label: "Preview", Icon: Eye },
+    { id: "notes", label: "Notes", Icon: MessageCircle },
     { id: "team", label: "Team", Icon: Users },
   ];
 
@@ -312,7 +398,12 @@ export default function AdminPage() {
             type="button"
             className="nav-pill"
             data-active={tab === t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => {
+              if (t.id === "notes" && overview?.menu?.date) {
+                setDate(overview.menu.date);
+              }
+              setTab(t.id);
+            }}
           >
             <t.Icon size={18} strokeWidth={2} />
             {t.label}
@@ -333,7 +424,10 @@ export default function AdminPage() {
       )}
 
       <div className="mt-4 space-y-4">
-        {(tab === "post" || tab === "extract" || tab === "preview") && (
+        {(tab === "post" ||
+          tab === "extract" ||
+          tab === "preview" ||
+          tab === "notes") && (
           <Card className="!p-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-0 max-w-xs flex-1 basis-[12rem]">
@@ -357,7 +451,10 @@ export default function AdminPage() {
               <button
                 type="button"
                 className="btn btn-secondary !text-sm"
-                onClick={() => loadExtract(date)}
+                onClick={() => {
+                  void loadExtract(date);
+                  if (tab === "notes") void loadNotes(date);
+                }}
               >
                 Load
               </button>
@@ -370,7 +467,7 @@ export default function AdminPage() {
             <Card>
               <p className="card-title">
                 {overview.menu
-                  ? `Live · ${overview.menu.itemCount} dishes · ${overview.menu.date}`
+                  ? `Live · ${overview.menu.itemCount} on the board · ${overview.menu.date}`
                   : "No menu for office today"}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -410,7 +507,10 @@ export default function AdminPage() {
                     className="flex items-center justify-between gap-2 py-2 text-sm"
                   >
                     <span>
-                      <strong>{m.date}</strong> · {m.itemCount} dishes
+                      <strong>{m.date}</strong> · {m.itemCount} posted
+                      {overview.menu?.id === m.id && overview.menu.itemCount > m.itemCount
+                        ? ` · ${overview.menu.itemCount} with salad bar`
+                        : ""}
                     </span>
                     <button
                       type="button"
@@ -460,9 +560,6 @@ export default function AdminPage() {
               }}
             >
               <h2 className="card-title">Upload photo</h2>
-              <p className="text-sm text-[var(--muted)]">
-                Drop image or pick · max 8MB · camera OK on phone
-              </p>
               <input
                 type="file"
                 accept="image/*"
@@ -495,6 +592,53 @@ export default function AdminPage() {
             <h2 className="card-title">
               Extraction · {flatItems.length} dishes
             </h2>
+            {menuDayId && (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <input
+                  className="field !py-1.5"
+                  placeholder="New dish name"
+                  value={newDish.name}
+                  onChange={(e) =>
+                    setNewDish((d) => ({ ...d, name: e.target.value }))
+                  }
+                />
+                <input
+                  className="field !py-1.5"
+                  placeholder="Station"
+                  value={newDish.station}
+                  onChange={(e) =>
+                    setNewDish((d) => ({ ...d, station: e.target.value }))
+                  }
+                />
+                <select
+                  className="field !py-1.5"
+                  value={newDish.meal}
+                  onChange={(e) =>
+                    setNewDish((d) => ({ ...d, meal: e.target.value }))
+                  }
+                >
+                  <option value="breakfast">breakfast</option>
+                  <option value="lunch">lunch</option>
+                  <option value="other">other</option>
+                </select>
+                <input
+                  className="field !py-1.5"
+                  placeholder="tags"
+                  value={newDish.tags}
+                  onChange={(e) =>
+                    setNewDish((d) => ({ ...d, tags: e.target.value }))
+                  }
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary sm:col-span-2"
+                  disabled={loading || !newDish.name.trim()}
+                  onClick={addDish}
+                >
+                  Add dish
+                </button>
+              </div>
+            )}
             {flatItems.length === 0 ? (
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Nothing for this date. Post first.
@@ -605,13 +749,122 @@ export default function AdminPage() {
                   {previewResult.items.slice(0, 40).map((i) => (
                     <li key={i.name}>
                       <strong>{i.decision}</strong> {i.name}{" "}
-                      <span className="text-[var(--muted)]">— {i.reason}</span>
+                      <span className="text-[var(--muted)]">: {i.reason}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
           </Card>
+        )}
+
+        {tab === "notes" && (
+          <>
+            {noteDishes.length === 0 ? (
+              <Card>
+                <p className="text-sm text-[var(--muted)]">
+                  No notes for this day.
+                </p>
+              </Card>
+            ) : (
+              <div className="card-grid-2">
+                {noteDishes.map((d) => (
+                  <Card
+                    key={d.dishName}
+                    className="note-dish cursor-pointer !p-4"
+                    role="button"
+                    tabIndex={0}
+                    data-open={openNoteDish === d.dishName ? "true" : undefined}
+                    onClick={() =>
+                      setOpenNoteDish((cur) =>
+                        cur === d.dishName ? null : d.dishName
+                      )
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setOpenNoteDish((cur) =>
+                          cur === d.dishName ? null : d.dishName
+                        );
+                      }
+                    }}
+                  >
+                    <p className="card-title">{d.dishName}</p>
+                    <p className="mt-1 text-sm text-[var(--muted)]">
+                      {d.avgStars != null && (
+                        <span className="dish-stars-read mr-2">
+                          {"★".repeat(Math.round(d.avgStars))}
+                          <span className="dish-stars-off">
+                            {"★".repeat(5 - Math.round(d.avgStars))}
+                          </span>
+                        </span>
+                      )}
+                      {d.count} note{d.count === 1 ? "" : "s"}
+                    </p>
+                  </Card>
+                ))}
+              </div>
+            )}
+            {openNoteDish && (
+              <div className="note-stage mt-5 space-y-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="section-title">{openNoteDish}</p>
+                  <button
+                    type="button"
+                    className="dish-flip-skip"
+                    onClick={() => setOpenNoteDish(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="note-stack">
+                  {(
+                    noteDishes.find((d) => d.dishName === openNoteDish)?.notes ||
+                    []
+                  ).map((n, i) => (
+                    <Card
+                      key={n.id}
+                      className="note-slip note-slip-voice !p-4"
+                      style={{ animationDelay: `${i * 45}ms` }}
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <p className="font-semibold text-[var(--ink)]">
+                          {n.userName}
+                        </p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {new Date(n.createdAt).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      {n.stars != null && (
+                        <p className="mt-1">
+                          <span className="dish-stars-read">
+                            {"★".repeat(n.stars)}
+                            <span className="dish-stars-off">
+                              {"★".repeat(5 - n.stars)}
+                            </span>
+                          </span>
+                        </p>
+                      )}
+                      {n.note ? (
+                        <p className="mt-2 text-sm leading-snug text-[var(--ink-soft)]">
+                          {n.note}
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-sm text-[var(--muted)]">
+                          Just the stars.
+                        </p>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {tab === "team" && (

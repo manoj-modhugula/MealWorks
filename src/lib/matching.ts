@@ -141,7 +141,6 @@ export function collectHardTerms(
     ...prefs.allergies,
     ...prefs.hardAvoids,
     ...activeTempTags,
-    ...termsFromFreeform(prefs.freeformNotes || ""),
   ]);
 }
 
@@ -388,10 +387,28 @@ export function matchMenuLocal(
           decision = "caution";
           reason = "Matches something you usually dislike";
         } else if (
+          goals.includes("low_spice") &&
+          (tags.includes("spicy") || dishHitsTerm(item.name, tags, "spicy"))
+        ) {
+          decision = "caution";
+          reason = "Spicy, and you asked for low spice";
+        } else if (
+          goals.includes("lighter_meals") &&
+          tags.some((t) =>
+            ["fried", "heavy", "cream", "pizza", "pastry"].includes(t)
+          )
+        ) {
+          decision = "caution";
+          reason = "Heavier than your lighter-meals goal";
+        } else if (
           likes.some((t) => dishHitsTerm(item.name, tags, t)) ||
           (goals.includes("high_protein") &&
             tags.some((t) =>
               ["chicken", "egg", "fish", "turkey", "dairy"].includes(t)
+            )) ||
+          (goals.includes("more_veggies") &&
+            tags.some((t) =>
+              ["vegetable", "veggie", "salad", "vegan"].includes(t)
             ))
         ) {
           decision = "recommended";
@@ -427,7 +444,7 @@ type Ranked = MatchPayload["items"][number];
 
 /**
  * Always 3 plate ideas for the cylinder carousel:
- * Breakfast · Lunch · Salad — personalized (Good items only).
+ * Breakfast, lunch, and salad plates from Good items.
  */
 function buildPlateIdeas(items: Ranked[]): MatchPayload["combos"] {
   const breakfastPool = items.filter(
@@ -464,7 +481,7 @@ function buildPlateIdeas(items: Ranked[]): MatchPayload["combos"] {
       "Salad bowl",
       saladPool,
       3,
-      "Few salad toppings fit you today — check the bar"
+      "Few salad toppings fit today."
     ),
   ];
 }

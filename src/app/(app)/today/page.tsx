@@ -2,17 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ChevronDown,
-  ThumbsDown,
-  ThumbsUp,
-  Utensils,
-} from "lucide-react";
+import { Utensils } from "lucide-react";
 import {
   Alert,
   BookLoader,
   Card,
-  DecisionBadge,
   EmptyState,
   Page,
   PageHeader,
@@ -20,11 +14,11 @@ import {
   ScoreRing,
 } from "@/components/ui";
 import { DateNav } from "@/components/date-nav";
+import { WeekStrip } from "@/components/week-strip";
 import { PlateCarousel } from "@/components/plate-carousel";
+import { DishCard, type DishNote } from "@/components/dish-card";
 import { deviceTimeZone, todayOnDevice, withDeviceTz } from "@/lib/client-date";
 import { getCache, setCache } from "@/lib/client-cache";
-import { ALLERGY_FAMILIES } from "@/lib/matching";
-import { weekdayShort } from "@/lib/dates";
 
 type MatchItem = {
   name: string;
@@ -46,6 +40,21 @@ type MatchData = {
   };
 };
 
+function asDishNotes(raw: unknown): Record<string, DishNote> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, DishNote> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!v || typeof v !== "object") continue;
+    const rec = v as Partial<DishNote>;
+    out[k] = {
+      vote: rec.vote || "ate",
+      stars: rec.stars ?? null,
+      note: rec.note || "",
+    };
+  }
+  return out;
+}
+
 const verdictLabel: Record<string, string> = {
   great: "Great day",
   mostly_fine: "Mostly fine",
@@ -56,7 +65,7 @@ const verdictLabel: Record<string, string> = {
 type TodayCache = {
   menu: { id?: string; date: string; isFallback?: boolean } | null;
   match: MatchData | null;
-  feedback: Record<string, string>;
+  feedback: Record<string, DishNote>;
   week: { date: string; score: number | null; hasMenu: boolean }[];
 };
 
@@ -73,16 +82,16 @@ export default function TodayPage() {
     isFallback?: boolean;
   } | null>(cached0?.menu ?? null);
   const [match, setMatch] = useState<MatchData | null>(cached0?.match ?? null);
-  const [filter, setFilter] = useState<"all" | "recommended" | "avoid">(
-    "recommended"
-  );
-  const [feedback, setFeedback] = useState<Record<string, string>>(
+  const [filter, setFilter] = useState<
+    "all" | "recommended" | "avoid" | "caution"
+  >("recommended");
+  const [feedback, setFeedback] = useState<Record<string, DishNote>>(
     cached0?.feedback ?? {}
   );
   const [week, setWeek] = useState<
     { date: string; score: number | null; hasMenu: boolean }[]
   >(cached0?.week ?? []);
-  const [openWhy, setOpenWhy] = useState<string | null>(null);
+  const [openNote, setOpenNote] = useState<string | null>(null);
 
   const applyPayload = useCallback((data: Record<string, unknown>) => {
     const m = data.menu as {
@@ -117,7 +126,7 @@ export default function TodayPage() {
       },
     });
     if (data.feedback && typeof data.feedback === "object") {
-      setFeedback(data.feedback as Record<string, string>);
+      setFeedback(asDishNotes(data.feedback));
     }
   }, []);
 
@@ -130,7 +139,6 @@ export default function TodayPage() {
 
       if (rematch) setBookBusy(true);
 
-      // Instant paint from cache — no full-page spinner on revisit
       if (cached) {
         setMenu(cached.menu);
         setMatch(cached.match);
@@ -216,7 +224,7 @@ export default function TodayPage() {
             menu: m,
             match: matchSnap,
             feedback:
-              (data.feedback as Record<string, string>) ||
+              (data.feedback as Record<string, DishNote>) ||
               (cached?.feedback ?? {}),
             week: weekDays,
           },
@@ -237,9 +245,14 @@ export default function TodayPage() {
     load({ d: date });
   }, [date]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    setOpenNote(null);
+  }, [date, filter]);
+
   const items = match?.payload?.items || [];
   const recCount = items.filter((i) => i.decision === "recommended").length;
   const avoidCount = items.filter((i) => i.decision === "avoid").length;
+  const maybeCount = items.filter((i) => i.decision === "caution").length;
 
   const filtered = useMemo(() => {
     return items.filter((i) =>
@@ -247,25 +260,22 @@ export default function TodayPage() {
     );
   }, [items, filter]);
 
-  async function vote(dishName: string, v: "up" | "down") {
-    if (!menu?.id) return;
+  async function sendNote(dishName: string, stars: number, note: string) {
+    if (!menu?.id) throw new Error("No menu today");
     const res = await fetch("/api/feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ menuDayId: menu.id, dishName, vote: v }),
+      body: JSON.stringify({ menuDayId: menu.id, dishName, stars, note }),
     });
     const data = await res.json();
-    if (res.ok && data.feedback) setFeedback(data.feedback);
-  }
-
-  function familyHint(reason: string): string[] | null {
-    const m = reason.match(/[“"]([^”"]+)[”"]/);
-    const term = (m?.[1] || "").toLowerCase();
-    if (term && ALLERGY_FAMILIES[term]) return ALLERGY_FAMILIES[term];
-    for (const k of Object.keys(ALLERGY_FAMILIES)) {
-      if (reason.toLowerCase().includes(k)) return ALLERGY_FAMILIES[k];
+    if (!res.ok) throw new Error(data.error || "Couldn’t send");
+    if (data.feedback) {
+      const next = data.feedback as Record<string, DishNote>;
+      setFeedback(next);
+      const cacheKey = `today:${date}`;
+      const cached = getCache<TodayCache>(cacheKey);
+      if (cached) setCache(cacheKey, { ...cached, feedback: next }, 3 * 60_000);
     }
-    return null;
   }
 
   const label = match
@@ -276,7 +286,11 @@ export default function TodayPage() {
     <Page>
       <PageHeader
         title="Today"
-        subtitle={menu?.date || undefined}
+        subtitle={
+          menu?.isFallback
+            ? `Latest posted · ${menu.date}`
+            : menu?.date || undefined
+        }
         action={
           <>
             <DateNav
@@ -298,24 +312,7 @@ export default function TodayPage() {
       />
 
       {week.length > 0 && (
-        <div className="week-strip mb-5" role="navigation" aria-label="Week">
-          {week.map((d) => (
-            <button
-              key={d.date}
-              type="button"
-              className="week-day"
-              data-active={d.date === date}
-              data-empty={!d.hasMenu}
-              onClick={() => d.hasMenu && setDate(d.date)}
-              disabled={!d.hasMenu}
-            >
-              <div className="week-day-name">{weekdayShort(d.date)}</div>
-              <div className="week-day-score">
-                {d.hasMenu && d.score != null ? d.score : "–"}
-              </div>
-            </button>
-          ))}
-        </div>
+        <WeekStrip days={week} date={date} onChange={setDate} />
       )}
 
       {loading && !match && !menu && <PageSkeleton rows={4} />}
@@ -349,7 +346,7 @@ export default function TodayPage() {
                   {match.headline}
                 </h2>
                 <p className="mt-1.5 text-[0.9375rem] leading-snug text-[var(--muted)]">
-                  {recCount} good · {avoidCount} skip
+                  {recCount} good · {maybeCount} maybe · {avoidCount} skip
                 </p>
                 {polishing && (
                   <p className="mt-2 text-xs font-medium text-[var(--muted)]" role="status">
@@ -358,7 +355,7 @@ export default function TodayPage() {
                 )}
                 {menu.isFallback && (
                   <p className="mt-1 text-xs text-[var(--caution-ink)]">
-                    Showing latest menu ({menu.date})
+                    No menu this day, showing the latest board.
                   </p>
                 )}
                 {match.source === "baseline" && !polishing && (
@@ -386,6 +383,7 @@ export default function TodayPage() {
             {(
               [
                 ["recommended", `Good ${recCount}`],
+                ["caution", `Maybe ${maybeCount}`],
                 ["avoid", `Skip ${avoidCount}`],
                 ["all", "All"],
               ] as const
@@ -398,9 +396,18 @@ export default function TodayPage() {
                 aria-checked={filter === id}
                 data-active={filter === id}
                 data-tone={
-                  id === "recommended" ? "good" : id === "avoid" ? "bad" : undefined
+                  id === "recommended"
+                    ? "good"
+                    : id === "avoid"
+                      ? "bad"
+                      : id === "caution"
+                        ? "maybe"
+                        : undefined
                 }
-                onClick={() => setFilter(id)}
+                onClick={() => {
+                  setOpenNote(null);
+                  setFilter(id);
+                }}
               >
                 {text}
               </button>
@@ -408,82 +415,17 @@ export default function TodayPage() {
           </div>
 
           <div className="card-grid-2">
-            {filtered.map((item) => {
-              const fam = familyHint(item.reason);
-              const open = openWhy === item.name;
-              const fb = feedback[item.name];
-              const tint =
-                item.decision === "recommended"
-                  ? "mint"
-                  : item.decision === "avoid"
-                    ? "rose"
-                    : undefined;
-              return (
-                <Card
-                  key={`${item.station}-${item.name}`}
-                  tint={tint}
-                  className="!p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold tracking-tight text-[var(--ink)]">
-                          {item.name}
-                        </p>
-                        <DecisionBadge decision={item.decision} />
-                      </div>
-                      <p className="mt-0.5 text-xs capitalize text-[var(--muted)]">
-                        {item.meal} · {item.station}
-                      </p>
-                      <p className="mt-1.5 text-sm leading-snug text-[var(--ink-soft)]">
-                        {item.reason}
-                      </p>
-                      {fam && (
-                        <button
-                          type="button"
-                          className="mt-1.5 inline-flex items-center gap-0.5 text-xs font-semibold text-[var(--lavender-ink)]"
-                          onClick={() => setOpenWhy(open ? null : item.name)}
-                        >
-                          Why
-                          <ChevronDown
-                            size={12}
-                            className={open ? "rotate-180" : undefined}
-                          />
-                        </button>
-                      )}
-                      {open && fam && (
-                        <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
-                          Includes: {fam.slice(0, 10).join(", ")}
-                          {fam.length > 10 ? "…" : ""}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 gap-1">
-                      <button
-                        type="button"
-                        className="icon-btn !h-9 !w-9"
-                        data-on={
-                          fb === "up" || fb === "ate" ? "true" : undefined
-                        }
-                        aria-label="Helpful"
-                        onClick={() => vote(item.name, "up")}
-                      >
-                        <ThumbsUp size={16} strokeWidth={2} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-btn !h-9 !w-9"
-                        data-on={fb === "down" ? "down" : undefined}
-                        aria-label="Wrong"
-                        onClick={() => vote(item.name, "down")}
-                      >
-                        <ThumbsDown size={16} strokeWidth={2} />
-                      </button>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
+            {filtered.map((item) => (
+              <DishCard
+                key={`${item.station}-${item.name}`}
+                item={item}
+                noted={feedback[item.name]}
+                open={openNote === item.name}
+                onOpen={() => setOpenNote(item.name)}
+                onClose={() => setOpenNote(null)}
+                onSend={(stars, note) => sendNote(item.name, stars, note)}
+              />
+            ))}
           </div>
           {filtered.length === 0 && (
             <p className="text-sm text-[var(--muted)]">Nothing in this filter.</p>

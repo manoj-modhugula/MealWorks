@@ -1,7 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { addDaysISO } from "@/lib/dates";
+import { addDaysISO, formatMonthDay } from "@/lib/dates";
 
 export function DateNav({
   date,
@@ -13,6 +14,9 @@ export function DateNav({
   maxDate?: string;
 }) {
   const canNext = !maxDate || date < maxDate;
+  const prevRef = useRef(date);
+  const dir = date > prevRef.current ? "fwd" : date < prevRef.current ? "back" : "none";
+  prevRef.current = date;
 
   return (
     <div className="date-nav">
@@ -24,7 +28,9 @@ export function DateNav({
       >
         <ChevronLeft size={18} strokeWidth={2} />
       </button>
-      <span className="date-nav-value">{date.slice(5)}</span>
+      <span className="date-nav-value" key={date} data-dir={dir}>
+        {formatMonthDay(date)}
+      </span>
       <button
         type="button"
         className="icon-btn !h-9 !w-9"
