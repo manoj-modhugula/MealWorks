@@ -58,6 +58,7 @@ Images/
 teaser/
 scripts/
 .claude/
+.superpowers/
 
 # Editor / OS
 .idea/

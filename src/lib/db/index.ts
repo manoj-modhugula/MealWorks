@@ -152,6 +152,16 @@ function ensureSchema(sqlite: Database.Database) {
       lunch_end TEXT NOT NULL DEFAULT '14:30',
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS dish_note_summaries (
+      menu_day_id TEXT NOT NULL REFERENCES menu_days(id) ON DELETE CASCADE,
+      dish_name TEXT NOT NULL,
+      sentence TEXT NOT NULL,
+      note_count INTEGER NOT NULL,
+      latest_created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (menu_day_id, dish_name)
+    );
   `);
 
   migrateUsers(sqlite);
@@ -170,6 +180,9 @@ function migrateUsers(sqlite: Database.Database) {
   const cols = tableColumns(sqlite, "users");
   if (!cols.has("email_verified_at")) {
     sqlite.exec(`ALTER TABLE users ADD COLUMN email_verified_at TEXT`);
+  }
+  if (!cols.has("blocked_at")) {
+    sqlite.exec(`ALTER TABLE users ADD COLUMN blocked_at TEXT`);
   }
   // Grandfather existing rows so a 0.x office is not locked out.
   sqlite

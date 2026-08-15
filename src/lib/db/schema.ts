@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { primaryKey, sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -8,6 +8,7 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull().default(""),
   isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
   emailVerifiedAt: text("email_verified_at"),
+  blockedAt: text("blocked_at"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -138,6 +139,24 @@ export const dishFeedback = sqliteTable("dish_feedback", {
   note: text("note").notNull().default(""),
   createdAt: text("created_at").notNull(),
 });
+
+/** Cached one-line AI summary of written notes for a dish on a day. */
+export const dishNoteSummaries = sqliteTable(
+  "dish_note_summaries",
+  {
+    menuDayId: text("menu_day_id")
+      .notNull()
+      .references(() => menuDays.id, { onDelete: "cascade" }),
+    dishName: text("dish_name").notNull(),
+    sentence: text("sentence").notNull(),
+    noteCount: integer("note_count").notNull(),
+    latestCreatedAt: text("latest_created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.menuDayId, t.dishName] }),
+  })
+);
 
 /** Singleton cafe service hours. One row, id = "default". */
 export const cafeSettings = sqliteTable("cafe_settings", {

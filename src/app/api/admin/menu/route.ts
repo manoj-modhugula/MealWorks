@@ -29,16 +29,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "file required" }, { status: 400 });
     }
 
-    const maxBytes = 8 * 1024 * 1024; // 8 MB
+    const maxBytes = 12 * 1024 * 1024;
     if (file.size > maxBytes) {
       return NextResponse.json(
-        { error: "Image too large (max 8 MB)." },
+        { error: "File too large (max 12 MB)." },
         { status: 400 }
       );
     }
-    if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp|gif)$/i.test(file.name)) {
+    const { isMenuUploadFile } = await import("@/lib/admin-view");
+    if (!isMenuUploadFile(file.name, file.type)) {
       return NextResponse.json(
-        { error: "Please upload an image file (JPEG, PNG, WebP)." },
+        { error: "Use a photo or a PDF." },
         { status: 400 }
       );
     }
@@ -47,9 +48,20 @@ export async function POST(req: Request) {
     const safeDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayISO();
     const buf = Buffer.from(await file.arrayBuffer());
     const rawExt = path.extname(file.name).toLowerCase();
-    const ext = [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(rawExt)
+    const ext = [
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".webp",
+      ".gif",
+      ".heic",
+      ".heif",
+      ".pdf",
+    ].includes(rawExt)
       ? rawExt
-      : ".png";
+      : file.type === "application/pdf"
+        ? ".pdf"
+        : ".png";
     const filename = `${safeDate}-${randomUUID()}${ext}`;
 
     // Save under Images/ (project root) and public/uploads for browser serving

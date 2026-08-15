@@ -230,7 +230,7 @@ export function upsertOAuthUser(input: {
       .from(schema.users)
       .where(eq(schema.users.id, linked.userId))
       .get();
-    if (!owner) return null;
+    if (!owner || owner.blockedAt) return null;
     if (email) {
       const emailOwner = db
         .select()
@@ -253,6 +253,7 @@ export function upsertOAuthUser(input: {
 
   let user = existing;
   if (existing) {
+    if (existing.blockedAt) return null;
     const hasPassword = Boolean(existing.passwordHash);
     if (hasPassword) return null;
   } else {
