@@ -68,6 +68,18 @@ export const accountDeleteSchema = z.object({
   confirmEmail: z.string().trim().email().max(120),
 });
 
+const hhmm = z
+  .string()
+  .trim()
+  .regex(/^\d{2}:\d{2}$/, "Use HH:MM");
+
+export const cafeHoursSchema = z.object({
+  breakfastStart: hhmm,
+  breakfastEnd: hhmm,
+  lunchStart: hhmm,
+  lunchEnd: hhmm,
+});
+
 export const menuItemCreateSchema = z.object({
   menuDayId: z.string().min(1),
   name: z.string().trim().min(1).max(200),
