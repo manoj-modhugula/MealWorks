@@ -8,6 +8,7 @@ import {
   nextAdminConfirm,
   personInitials,
 } from "@/lib/admin-view";
+import { scheduleFlipArm } from "@/lib/flip-arm";
 
 export type OfficePerson = {
   id: string;
@@ -38,6 +39,7 @@ export function PersonCard({
   const faceRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
   const hold = useRef<number | null>(null);
+  const pressing = useRef(false);
   const timers = useRef<number[]>([]);
   const faceHRef = useRef(0);
   const [showBack, setShowBack] = useState(false);
@@ -154,7 +156,12 @@ export function PersonCard({
       setHeight(faceH);
     }
     onOpen();
-    later(() => setArmed(true), 220);
+    window.getSelection()?.removeAllRanges();
+    scheduleFlipArm({
+      later,
+      holding: () => pressing.current,
+      arm: () => setArmed(true),
+    });
   }
 
   async function confirmBlock() {
@@ -179,7 +186,13 @@ export function PersonCard({
         if (open) onClose();
         else beginFlip();
       }}
+      onMouseDown={(e) => {
+        const t = e.target as HTMLElement;
+        if (t.closest("input, textarea")) return;
+        e.preventDefault();
+      }}
       onPointerDown={(e) => {
+        pressing.current = true;
         if (self) return;
         if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
         clearHold();
@@ -188,8 +201,14 @@ export function PersonCard({
           else beginFlip();
         }, 260);
       }}
-      onPointerUp={clearHold}
-      onPointerCancel={clearHold}
+      onPointerUp={() => {
+        pressing.current = false;
+        clearHold();
+      }}
+      onPointerCancel={() => {
+        pressing.current = false;
+        clearHold();
+      }}
       onPointerMove={(e) => {
         if (e.pointerType === "touch" || e.pointerType === "pen") {
           if (Math.abs(e.movementX) + Math.abs(e.movementY) > 6) clearHold();
@@ -206,21 +225,20 @@ export function PersonCard({
               <span className="admin-person-mark" aria-hidden>
                 {personInitials(person.name)}
               </span>
-              <div className="min-w-0">
-                <div className="admin-person-name">
-                  <p className="font-semibold tracking-tight text-[var(--ink)]">
-                    {person.name}
-                  </p>
-                  {person.isAdmin && (
-                    <span className="admin-person-role">Admin</span>
-                  )}
-                  {blocked && (
-                    <span className="admin-person-role">Blocked</span>
-                  )}
-                </div>
-                <p className="admin-person-email">{person.email}</p>
+              <div className="admin-person-name">
+                <p className="font-semibold tracking-tight text-[var(--ink)]">
+                  {person.name}
+                </p>
+                {person.isAdmin && (
+                  <span className="admin-person-role">Admin</span>
+                )}
+                {blocked && (
+                  <span className="admin-person-role">Blocked</span>
+                )}
               </div>
             </div>
+            <div className="admin-person-foot">
+              <p className="admin-person-email">{person.email}</p>
             {self || blocked ? (
               <button
                 type="button"
@@ -308,6 +326,7 @@ export function PersonCard({
                 </div>
               </div>
             )}
+            </div>
           </Card>
 
           {showBack && (

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
 import { AnalogWatch } from "@/components/analog-watch";
+import { BoardDishCard } from "@/components/board-dish-card";
 import { NoteDishPanel } from "@/components/note-dish-panel";
 import { PeopleRail } from "@/components/people-rail";
 import { PersonCard } from "@/components/person-card";
@@ -13,13 +13,24 @@ import { DateNav } from "@/components/date-nav";
 import { todayOnDevice } from "@/lib/client-date";
 import {
   ADMIN_ROOMS,
+  BOARD_MEAL_VIEWS,
+  addDishDraft,
+  boardFileLabel,
   boardStatus,
   canToggleAdmin,
+  dishDraftDirty,
+  dishSavePlan,
+  editDishName,
   emptyStarCounts,
   isMenuUploadFile,
+  itemInBoardMeal,
+  markDishDeleted,
   menuUploadKind,
   roomShowsDate,
+  visibleDishDrafts,
   type AdminRoom,
+  type BoardMealView,
+  type DishDraft,
   type StarCounts,
 } from "@/lib/admin-view";
 import { formatAnalogLabel, parseHHMM } from "@/lib/analog-time";
@@ -54,13 +65,7 @@ type NoteDish = {
   starCounts: StarCounts;
 };
 
-type FlatItem = {
-  id: string;
-  meal: string;
-  station: string;
-  name: string;
-  tags: string[];
-};
+type FlatItem = DishDraft;
 
 export default function AdminPage() {
   const { data: session } = useSession();
@@ -75,6 +80,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [flatItems, setFlatItems] = useState<FlatItem[]>([]);
+  const [draftItems, setDraftItems] = useState<DishDraft[]>([]);
   const [menuDayId, setMenuDayId] = useState<string | null>(null);
   const [sourceImagePath, setSourceImagePath] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -103,6 +109,12 @@ export default function AdminPage() {
     defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS)
   );
   const noteMealTouched = useRef(false);
+  const [boardMeal, setBoardMeal] = useState<BoardMealView>(() => {
+    const meal = defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS);
+    return meal === "breakfast" ? "breakfast" : "lunch";
+  });
+  const boardMealTouched = useRef(false);
+  const [openBoardDishId, setOpenBoardDishId] = useState<string | null>(null);
   const [hours, setHours] = useState<CafeHours>({ ...DEFAULT_CAFE_HOURS });
   const [hoursSaving, setHoursSaving] = useState(false);
   const [hourField, setHourField] = useState<HoursField>("breakfastStart");
@@ -114,32 +126,40 @@ export default function AdminPage() {
     if (dateRef.current !== d) return;
     if (res.status === 404) {
       setFlatItems([]);
+      setDraftItems([]);
       setMenuDayId(null);
       setSourceImagePath(null);
+      setAdding(false);
+      setOpenBoardDishId(null);
       return;
     }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed");
     setMenuDayId(data.id);
     setSourceImagePath(data.sourceImagePath || null);
-    if (data.flatItems) setFlatItems(data.flatItems);
-    else {
-      const flat: FlatItem[] = [];
-      for (const meal of data.menu?.meals || []) {
-        for (const st of meal.stations || []) {
-          for (const it of st.items || []) {
-            flat.push({
-              id: it.id || `${meal.type}-${st.name}-${it.name}`,
-              meal: meal.type,
-              station: st.name,
-              name: it.name,
-              tags: it.tags || [],
-            });
+    const flat: FlatItem[] = data.flatItems
+      ? data.flatItems
+      : (() => {
+          const rows: FlatItem[] = [];
+          for (const meal of data.menu?.meals || []) {
+            for (const st of meal.stations || []) {
+              for (const it of st.items || []) {
+                rows.push({
+                  id: it.id || `${meal.type}-${st.name}-${it.name}`,
+                  meal: meal.type,
+                  station: st.name,
+                  name: it.name,
+                  tags: it.tags || [],
+                });
+              }
+            }
           }
-        }
-      }
-      setFlatItems(flat);
-    }
+          return rows;
+        })();
+    setFlatItems(flat);
+    setDraftItems(flat);
+    setAdding(false);
+    setOpenBoardDishId(null);
   }, []);
 
   const loadNotes = useCallback(async (d: string) => {
@@ -182,8 +202,12 @@ export default function AdminPage() {
     if (!res.ok) throw new Error(data.error || "Failed");
     if (data.hours) {
       setHours(data.hours);
+      const meal = defaultMealFromHours(new Date(), data.hours);
       if (!noteMealTouched.current) {
-        setNoteMeal(defaultMealFromHours(new Date(), data.hours));
+        setNoteMeal(meal);
+      }
+      if (!boardMealTouched.current) {
+        setBoardMeal(meal === "breakfast" ? "breakfast" : "lunch");
       }
     }
   }, []);
@@ -235,7 +259,10 @@ export default function AdminPage() {
   useEffect(() => {
     if (!session?.user?.isAdmin) return;
     setAdding(false);
+    setOpenBoardDishId(null);
     setOpenNoteDish(null);
+    setMessage("");
+    setError("");
     setFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
@@ -277,19 +304,18 @@ export default function AdminPage() {
     if (!f && fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  async function upload() {
-    if (!file) {
-      setError("Choose a file");
+  async function uploadPicked(picked: File) {
+    if (menuDayId && !confirm("Replace the menu for this day?")) {
+      onFile(null);
       return;
     }
-    if (menuDayId && !confirm("Replace the menu for this day?")) return;
     setLoading(true);
     setError("");
     setMessage("");
     try {
       setStage("Reading menu");
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", picked);
       form.append("date", date);
       const res = await fetch("/api/admin/menu", { method: "POST", body: form });
       const data = await res.json();
@@ -305,26 +331,57 @@ export default function AdminPage() {
     }
   }
 
-  async function patchItem(
-    item: FlatItem,
-    patch: Partial<FlatItem> & { delete?: boolean }
-  ) {
+  function pickFile(next: File | null) {
+    onFile(next);
+    if (next) void uploadPicked(next);
+  }
+
+  async function saveDishes() {
     if (!menuDayId) return;
+    const plan = dishSavePlan(flatItems, draftItems);
+    if (!dishDraftDirty(flatItems, draftItems)) return;
     setLoading(true);
+    setError("");
+    setMessage("");
     try {
-      const res = await fetch("/api/admin/menu/items", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          menuDayId,
-          itemId: item.id,
-          name: patch.name,
-          delete: patch.delete,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      for (const id of plan.remove) {
+        const res = await fetch("/api/admin/menu/items", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ menuDayId, itemId: id, delete: true }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+      }
+      for (const row of plan.update) {
+        const res = await fetch("/api/admin/menu/items", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            menuDayId,
+            itemId: row.id,
+            name: row.name,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+      }
+      for (const row of plan.create) {
+        const res = await fetch("/api/admin/menu/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            menuDayId,
+            name: row.name,
+            meal: row.meal,
+            station: row.station,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+      }
       await loadBoard(date);
+      setMessage("Dishes saved");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -371,31 +428,11 @@ export default function AdminPage() {
     if (res.ok) await loadPeople();
   }
 
-  async function addDish() {
-    if (!menuDayId || !newDish.name.trim()) return;
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/admin/menu/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          menuDayId,
-          name: newDish.name,
-          meal: newDish.meal,
-          station: newDish.station || "Other",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      setNewDish({ name: "", meal: newDish.meal, station: "" });
-      setAdding(false);
-      await loadBoard(date);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed");
-    } finally {
-      setLoading(false);
-    }
+  function addDish() {
+    if (!newDish.name.trim()) return;
+    setDraftItems((rows) => addDishDraft(rows, newDish));
+    setNewDish({ name: "", meal: boardMeal, station: "" });
+    setAdding(false);
   }
 
   async function deleteDay(d: string) {
@@ -405,6 +442,7 @@ export default function AdminPage() {
     });
     onFile(null);
     setAdding(false);
+    setDraftItems([]);
     await refreshAll({ soft: true });
   }
 
@@ -426,6 +464,15 @@ export default function AdminPage() {
         ? sourceImagePath?.split("/").pop() || "Menu.pdf"
         : null;
   const wellEmpty = !wellImage && !wellPdfName;
+  const dishesDirty = dishDraftDirty(flatItems, draftItems);
+  const visibleBoardDishes = visibleDishDrafts(draftItems).filter((d) =>
+    itemInBoardMeal(d, boardMeal)
+  );
+  const boardMealLabel =
+    BOARD_MEAL_VIEWS.find((m) => m.id === boardMeal)?.label || "this meal";
+  const dishesNeedName = visibleDishDrafts(draftItems).some(
+    (d) => !d.name.trim()
+  );
   const visibleNoteDishes = noteDishes.filter((d) =>
     itemInMealView({ meal: d.meal, station: d.station }, noteMeal)
   );
@@ -477,15 +524,6 @@ export default function AdminPage() {
                 <h2 className="card-title">
                   {boardStatus({ hasMenu, itemCount: flatItems.length })}
                 </h2>
-                {hasMenu && (
-                  <button
-                    type="button"
-                    className="dish-flip-skip"
-                    onClick={() => void deleteDay(date)}
-                  >
-                    Remove this day
-                  </button>
-                )}
               </div>
 
               <div
@@ -494,7 +532,7 @@ export default function AdminPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   const f = e.dataTransfer.files?.[0];
-                  if (f) onFile(f);
+                  if (f) pickFile(f);
                 }}
               >
                 <input
@@ -503,7 +541,7 @@ export default function AdminPage() {
                   type="file"
                   accept="image/*,application/pdf,.heic,.heif,.pdf"
                   className="sr-only"
-                  onChange={(e) => onFile(e.target.files?.[0] || null)}
+                  onChange={(e) => pickFile(e.target.files?.[0] || null)}
                 />
                 {wellEmpty ? (
                   <label className="admin-board-well" htmlFor="board-file">
@@ -528,67 +566,77 @@ export default function AdminPage() {
 
               <div className="admin-board-actions">
                 <label className="chip" htmlFor="board-file">
-                  Choose file
+                  {boardFileLabel(hasMenu)}
                 </label>
-                {file && (
+                {hasMenu && (
                   <button
                     type="button"
-                    className="dish-flip-skip"
-                    onClick={() => onFile(null)}
+                    className="btn btn-danger"
+                    disabled={loading}
+                    onClick={() => void deleteDay(date)}
                   >
-                    Clear
+                    Remove
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={loading || !file}
-                  onClick={() => void upload()}
-                >
-                  {hasMenu ? "Replace" : "Post"}
-                </button>
               </div>
             </Card>
 
             {hasMenu && (
-              <Card>
-                <h2 className="card-title">Dishes</h2>
-                <div className="mt-3 space-y-2">
-                {flatItems.map((it) => (
-                  <div key={it.id} className="admin-dish">
-                    <div className="min-w-0 flex-1">
-                      <input
-                        className="field !py-1.5"
-                        value={it.name}
-                        aria-label="Dish name"
-                        onChange={(e) =>
-                          setFlatItems((rows) =>
-                            rows.map((r) =>
-                              r.id === it.id ? { ...r, name: e.target.value } : r
-                            )
+              <div className="admin-dishes-section">
+                <div className="today-filter-row">
+                  <h2 className="card-title">Dishes</h2>
+                  <div className="today-meal-select">
+                    <select
+                      className="today-meal-select-face"
+                      aria-label="Meal"
+                      value={boardMeal}
+                      onChange={(e) => {
+                        const next = e.target.value as BoardMealView;
+                        boardMealTouched.current = true;
+                        setBoardMeal(next);
+                        setOpenBoardDishId(null);
+                        setNewDish((d) => ({ ...d, meal: next }));
+                      }}
+                    >
+                      {BOARD_MEAL_VIEWS.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {visibleBoardDishes.length === 0 ? (
+                  <Card>
+                    <p className="text-sm text-[var(--muted)]">
+                      No dishes in {boardMealLabel}.
+                    </p>
+                  </Card>
+                ) : (
+                  <div className="card-grid-2">
+                    {visibleBoardDishes.map((it) => (
+                      <BoardDishCard
+                        key={it.id}
+                        dish={it}
+                        open={openBoardDishId === it.id}
+                        onOpen={() => setOpenBoardDishId(it.id)}
+                        onClose={() => setOpenBoardDishId(null)}
+                        onRename={(name) =>
+                          setDraftItems((rows) =>
+                            editDishName(rows, it.id, name)
                           )
                         }
-                        onBlur={() => {
-                          if (it.name.trim()) patchItem(it, { name: it.name });
-                        }}
+                        onDelete={() =>
+                          setDraftItems((rows) =>
+                            markDishDeleted(rows, it.id)
+                          )
+                        }
                       />
-                      <p className="mt-1 text-xs text-[var(--muted)]">
-                        {it.meal} · {it.station}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="icon-btn icon-btn-danger !h-9 !w-9"
-                      onClick={() => patchItem(it, { delete: true })}
-                      aria-label="Delete dish"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    ))}
                   </div>
-                ))}
-
-                {adding ? (
-                  <div className="admin-add">
+                )}
+                {adding && (
+                  <Card className="admin-add">
                     <input
                       className="field !py-1.5"
                       placeholder="Dish name"
@@ -617,35 +665,41 @@ export default function AdminPage() {
                         setNewDish((d) => ({ ...d, station: e.target.value }))
                       }
                     />
-                    <div className="admin-quiet-row">
-                      <button
-                        type="button"
-                        className="btn btn-primary !py-1.5 !text-sm"
-                        disabled={loading || !newDish.name.trim()}
-                        onClick={() => void addDish()}
-                      >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        className="dish-flip-skip"
-                        onClick={() => setAdding(false)}
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                ) : (
+                    <button
+                      type="button"
+                      className="chip"
+                      onClick={() => setAdding(false)}
+                    >
+                      Close
+                    </button>
+                  </Card>
+                )}
+                <div className="admin-board-actions admin-dishes-foot">
                   <button
                     type="button"
-                    className="dish-flip-skip"
-                    onClick={() => setAdding(true)}
+                    className="chip"
+                    disabled={adding && !newDish.name.trim()}
+                    onClick={() => {
+                      if (adding) {
+                        addDish();
+                        return;
+                      }
+                      setNewDish((d) => ({ ...d, meal: boardMeal }));
+                      setAdding(true);
+                    }}
                   >
                     Add dish
                   </button>
-                )}
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={loading || !dishesDirty || dishesNeedName}
+                    onClick={() => void saveDishes()}
+                  >
+                    Save
+                  </button>
                 </div>
-              </Card>
+              </div>
             )}
           </>
         )}
@@ -697,20 +751,32 @@ export default function AdminPage() {
                     <p className="font-semibold tracking-tight text-[var(--ink)]">
                       {d.dishName}
                     </p>
-                    <p className="mt-0.5 text-xs capitalize text-[var(--muted)]">
-                      {d.meal} · {d.station}
-                    </p>
-                    <p className="mt-1.5 text-sm leading-snug text-[var(--ink-soft)]">
-                      {d.avgStars != null && (
-                        <span className="dish-stars-read mr-2">
-                          {"★".repeat(Math.round(d.avgStars))}
-                          <span className="dish-stars-off">
-                            {"★".repeat(5 - Math.round(d.avgStars))}
+                    <div className="note-dish-foot">
+                      <p className="text-xs capitalize text-[var(--muted)]">
+                        {d.meal} · {d.station}
+                      </p>
+                      <div className="note-dish-stats">
+                        {d.avgStars != null && (
+                          <span
+                            className="chip note-dish-chip note-dish-chip-stars"
+                            aria-label={`${Math.round(d.avgStars)} of 5`}
+                          >
+                            <span className="dish-stars-read" aria-hidden>
+                              {"★".repeat(Math.round(d.avgStars))}
+                              <span className="dish-stars-off">
+                                {"★".repeat(5 - Math.round(d.avgStars))}
+                              </span>
+                            </span>
                           </span>
+                        )}
+                        <span
+                          className="chip note-dish-chip"
+                          aria-label={`${d.count} note${d.count === 1 ? "" : "s"}`}
+                        >
+                          {d.count}
                         </span>
-                      )}
-                      {d.count} note{d.count === 1 ? "" : "s"}
-                    </p>
+                      </div>
+                    </div>
                   </Card>
                 ))}
               </div>

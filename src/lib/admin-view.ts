@@ -1,3 +1,5 @@
+import { SALAD_COMPOSE_STATION } from "./salad-compose";
+
 export const ADMIN_ROOMS = [
   { id: "board", label: "Board" },
   { id: "notes", label: "Notes" },
@@ -191,6 +193,118 @@ export function nextAdminConfirm(
 
 export function adminConfirmOk(typed: string, phrase: string): boolean {
   return typed === phrase;
+}
+
+export function boardFileLabel(hasMenu: boolean): string {
+  return hasMenu ? "Replace file" : "Choose file";
+}
+
+export const BOARD_MEAL_VIEWS = [
+  { id: "breakfast", label: "Breakfast" },
+  { id: "lunch", label: "Lunch" },
+] as const;
+
+export type BoardMealView = (typeof BOARD_MEAL_VIEWS)[number]["id"];
+
+export function itemInBoardMeal(
+  item: { meal: string; station: string },
+  view: BoardMealView
+): boolean {
+  if (item.station === SALAD_COMPOSE_STATION) return false;
+  if (view === "breakfast") return item.meal === "breakfast";
+  return item.meal !== "breakfast";
+}
+
+export type DishDraft = {
+  id: string;
+  meal: string;
+  station: string;
+  name: string;
+  tags: string[];
+  pending?: "add" | "delete";
+};
+
+export function editDishName(
+  rows: DishDraft[],
+  id: string,
+  name: string
+): DishDraft[] {
+  return rows.map((row) => (row.id === id ? { ...row, name } : row));
+}
+
+export function markDishDeleted(rows: DishDraft[], id: string): DishDraft[] {
+  return rows.flatMap((row) => {
+    if (row.id !== id) return [row];
+    if (row.pending === "add") return [];
+    return [{ ...row, pending: "delete" as const }];
+  });
+}
+
+export function visibleDishDrafts(rows: DishDraft[]): DishDraft[] {
+  return rows.filter((row) => row.pending !== "delete");
+}
+
+export function addDishDraft(
+  rows: DishDraft[],
+  dish: { name: string; meal: string; station: string }
+): DishDraft[] {
+  const name = dish.name.trim();
+  if (!name) return rows;
+  return [
+    ...rows,
+    {
+      id: `draft-${rows.length + 1}-${name}`,
+      meal: dish.meal,
+      station: dish.station.trim() || "Other",
+      name,
+      tags: [],
+      pending: "add",
+    },
+  ];
+}
+
+export function dishDraftDirty(saved: DishDraft[], draft: DishDraft[]): boolean {
+  const plan = dishSavePlan(saved, draft);
+  return (
+    plan.update.length > 0 || plan.remove.length > 0 || plan.create.length > 0
+  );
+}
+
+export function dishSavePlan(
+  saved: DishDraft[],
+  draft: DishDraft[]
+): {
+  update: { id: string; name: string }[];
+  remove: string[];
+  create: { name: string; meal: string; station: string }[];
+} {
+  const savedById = new Map(saved.map((row) => [row.id, row]));
+  const update: { id: string; name: string }[] = [];
+  const remove: string[] = [];
+  const create: { name: string; meal: string; station: string }[] = [];
+  for (const row of draft) {
+    if (row.pending === "add") {
+      const name = row.name.trim();
+      if (name) {
+        create.push({
+          name,
+          meal: row.meal,
+          station: row.station.trim() || "Other",
+        });
+      }
+      continue;
+    }
+    if (row.pending === "delete") {
+      if (savedById.has(row.id)) remove.push(row.id);
+      continue;
+    }
+    const prev = savedById.get(row.id);
+    const name = row.name.trim();
+    if (prev && name && name !== prev.name) {
+      update.push({ id: row.id, name });
+    }
+  }
+  return { update, remove, create };
 }
 
 export function personInitials(name: string): string {

@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
+import { SALAD_COMPOSE_STATION } from "./salad-compose";
 import {
   ADMIN_ROOMS,
   adminConfirmOk,
   adminConfirmPhrase,
+  BOARD_MEAL_VIEWS,
+  addDishDraft,
+  boardFileLabel,
   boardStatus,
   canBlockUser,
   canToggleAdmin,
+  dishDraftDirty,
+  dishSavePlan,
+  editDishName,
+  itemInBoardMeal,
+  markDishDeleted,
   nextAdminConfirm,
   emptyStarCounts,
   emptyStarFilterCopy,
@@ -21,6 +30,8 @@ import {
   starPercents,
   summaryCacheFresh,
   toPublicNote,
+  visibleDishDrafts,
+  type DishDraft,
 } from "./admin-view";
 
 describe("admin rooms", () => {
@@ -237,5 +248,102 @@ describe("personInitials", () => {
 
   it("uses two letters of a single name", () => {
     expect(personInitials("Nani")).toBe("NA");
+  });
+});
+
+describe("boardFileLabel", () => {
+  it("is Choose file before a menu is up, Replace file after", () => {
+    expect(boardFileLabel(false)).toBe("Choose file");
+    expect(boardFileLabel(true)).toBe("Replace file");
+  });
+});
+
+describe("BOARD_MEAL_VIEWS", () => {
+  it("is Breakfast and Lunch only", () => {
+    expect(BOARD_MEAL_VIEWS.map((m) => m.id)).toEqual(["breakfast", "lunch"]);
+  });
+});
+
+describe("itemInBoardMeal", () => {
+  const oats = { meal: "breakfast", station: "Hot" };
+  const rice = { meal: "lunch", station: "Indian" };
+  const extra = { meal: "other", station: "Other" };
+  const salad = { meal: "lunch", station: SALAD_COMPOSE_STATION };
+
+  it("keeps breakfast dishes on Breakfast", () => {
+    expect(itemInBoardMeal(oats, "breakfast")).toBe(true);
+    expect(itemInBoardMeal(rice, "breakfast")).toBe(false);
+  });
+
+  it("puts lunch and other dishes on Lunch, never salad", () => {
+    expect(itemInBoardMeal(rice, "lunch")).toBe(true);
+    expect(itemInBoardMeal(extra, "lunch")).toBe(true);
+    expect(itemInBoardMeal(oats, "lunch")).toBe(false);
+    expect(itemInBoardMeal(salad, "breakfast")).toBe(false);
+    expect(itemInBoardMeal(salad, "lunch")).toBe(false);
+  });
+});
+
+const oats: DishDraft = {
+  id: "1",
+  meal: "breakfast",
+  station: "Hot",
+  name: "Oats",
+  tags: [],
+};
+const rice: DishDraft = {
+  id: "2",
+  meal: "lunch",
+  station: "Indian",
+  name: "Rice",
+  tags: [],
+};
+
+describe("dish drafts", () => {
+  it("edits a name only in the draft", () => {
+    const next = editDishName([oats, rice], "1", "Steel oats");
+    expect(next.find((d) => d.id === "1")?.name).toBe("Steel oats");
+    expect(oats.name).toBe("Oats");
+  });
+
+  it("hides a deleted dish and remembers the delete", () => {
+    const next = markDishDeleted([oats, rice], "2");
+    expect(visibleDishDrafts(next).map((d) => d.id)).toEqual(["1"]);
+    expect(next.find((d) => d.id === "2")?.pending).toBe("delete");
+  });
+
+  it("adds a new dish as pending", () => {
+    const next = addDishDraft([oats], {
+      name: "Idli",
+      meal: "breakfast",
+      station: "South",
+    });
+    const added = next[next.length - 1];
+    expect(added.name).toBe("Idli");
+    expect(added.pending).toBe("add");
+    expect(added.id.startsWith("draft-")).toBe(true);
+  });
+
+  it("is dirty after an edit, add, or delete", () => {
+    expect(dishDraftDirty([oats, rice], [oats, rice])).toBe(false);
+    expect(dishDraftDirty([oats, rice], editDishName([oats, rice], "1", "Steel oats"))).toBe(
+      true
+    );
+    expect(dishDraftDirty([oats], addDishDraft([oats], { name: "Idli", meal: "breakfast", station: "South" }))).toBe(
+      true
+    );
+    expect(dishDraftDirty([oats, rice], markDishDeleted([oats, rice], "2"))).toBe(true);
+  });
+
+  it("plans creates, name patches, and deletes for Save", () => {
+    const draft = addDishDraft(
+      editDishName(markDishDeleted([oats, rice], "2"), "1", "Steel oats"),
+      { name: "Idli", meal: "breakfast", station: "South" }
+    );
+    expect(dishSavePlan([oats, rice], draft)).toEqual({
+      update: [{ id: "1", name: "Steel oats" }],
+      remove: ["2"],
+      create: [{ name: "Idli", meal: "breakfast", station: "South" }],
+    });
   });
 });
