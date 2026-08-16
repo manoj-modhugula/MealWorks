@@ -2873,7 +2873,16 @@ select.field {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  -webkit-user-drag: none;
   touch-action: manipulation;
+  cursor: default;
+}
+.dish-flip p,
+.dish-flip span,
+.dish-flip .card {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
 }
 .dish-flip-clip {
   overflow: visible;
@@ -2930,9 +2939,28 @@ select.field {
   pointer-events: none;
 }
 .dish-flip .dish-flip-back input,
-.dish-flip .dish-flip-back textarea {
-  -webkit-user-select: text;
-  user-select: text;
+.dish-flip .dish-flip-back textarea,
+.dish-flip-back .field {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  cursor: default !important;
+  caret-color: transparent;
+}
+.dish-flip-back .field:hover:not(:focus) {
+  border-color: var(--field-border);
+  border-top-color: var(--field-border-top);
+  border-bottom-color: var(--field-border-bottom);
+  background: var(--field-bg) !important;
+  box-shadow: var(--field-shadow) !important;
+}
+.dish-flip .dish-flip-back input:focus,
+.dish-flip .dish-flip-back textarea:focus,
+.dish-flip-back .field:focus,
+.dish-flip-back .field:focus-visible {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  cursor: text !important;
+  caret-color: auto;
 }
 
 /* Card hover lift fights rotateY. Lift the whole flip instead. */
@@ -3289,10 +3317,10 @@ select.field {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.85rem;
-  min-height: 2.45rem;
-  padding: 0.38rem 0.5rem;
-  font-size: 1.55rem;
+  min-width: 2.4rem;
+  min-height: 2.1rem;
+  padding: 0.3rem 0.42rem;
+  font-size: 1.28rem;
   line-height: 1;
 }
 .people-rail-of {
@@ -3321,13 +3349,59 @@ select.field {
   }
 }
 .note-dish {
-  min-height: 6.375rem;
-}
-.dish-flip-face.admin-person {
-  min-height: 7.1875rem;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-height: 6.375rem;
+}
+.note-dish-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.65rem;
+}
+.note-dish-foot > p {
+  min-width: 0;
+}
+.note-dish-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.note-dish-chip {
+  pointer-events: none;
+  cursor: default;
+  min-height: 1.85rem;
+  padding: 0.28rem 0.62rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.note-dish-chip-stars {
+  box-shadow: var(--elevate-1), var(--meal-select-ring);
+}
+.note-dish-chip-stars .dish-stars-read {
+  display: inline-block;
+  font-size: 0.78rem;
+  line-height: 1;
+  color: inherit;
+}
+.note-dish-chip-stars .dish-stars-off {
+  color: var(--muted);
+  opacity: 0.4;
+}
+.dish-flip-face.admin-person {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-height: 7.1875rem;
   padding: 1rem !important;
 }
 .admin-people {
@@ -3343,7 +3417,7 @@ select.field {
 }
 .admin-person-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.7rem;
   min-width: 0;
 }
@@ -3384,14 +3458,24 @@ select.field {
   text-transform: uppercase;
 }
 .admin-person-email {
-  margin: 0.2rem 0 0;
+  margin: 0;
+  margin-left: calc(2.25rem + 0.7rem);
+  min-width: 0;
   font-size: 0.75rem;
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+.admin-person-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.65rem;
+}
 .admin-person-action.btn {
-  margin-top: auto;
-  align-self: flex-end;
+  margin-top: 0;
+  align-self: auto;
+  margin-left: auto;
   min-width: 0;
   min-height: 2.35rem;
   justify-content: center;
@@ -3402,8 +3486,9 @@ select.field {
   line-height: 1.2;
 }
 .admin-confirm {
-  margin-top: auto;
-  align-self: flex-end;
+  margin-top: 0;
+  align-self: auto;
+  margin-left: auto;
   min-width: 0;
   perspective: 780px;
 }
@@ -3607,14 +3692,104 @@ select.field {
   padding: 0.68rem 1.15rem;
   font-size: 0.9375rem;
 }
-.admin-board-actions .btn-primary {
+.admin-board-actions .btn {
   margin-left: auto;
-  min-width: 11.5rem;
+  min-width: 6.75rem;
 }
-.admin-dish {
+.admin-dishes-section {
   display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
+  flex-direction: column;
+  gap: 1.15rem;
+  padding-top: 1.25rem;
+}
+.admin-dishes-section .card-title {
+  font-size: 1.2rem;
+}
+.admin-dishes-foot .chip {
+  box-shadow: var(--elevate-1), var(--meal-select-ring);
+}
+.admin-dishes-foot .chip:hover:not(:disabled) {
+  box-shadow: var(--elevate-2), var(--meal-select-ring);
+}
+.admin-dishes-foot .chip:disabled,
+.admin-board-dish-actions .chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--elevate-1);
+}
+.dish-flip-face.board-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-height: 6.375rem;
+  padding: 1rem !important;
+}
+.dish-flip-back.admin-board-dish {
+  min-height: 6.375rem;
+  padding: 1rem !important;
+}
+.today-rate-back {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: calc(6.375rem - 2rem);
+}
+.today-rate-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.65rem;
+}
+.today-rate-ask {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.today-rate-chip {
+  margin-left: auto;
+  cursor: default;
+  min-height: 2.35rem;
+  padding: 0.22rem 0.5rem;
+  box-shadow: var(--elevate-1), var(--meal-select-ring);
+}
+.dish-flip-back-body:not([data-armed="true"]) .today-rate-chip,
+.dish-flip-back-body:not([data-armed="true"]) .today-rate-chip * {
+  pointer-events: none;
+}
+.today-rate-chip .dish-stars {
+  margin: 0;
+  gap: 0;
+}
+.today-rate-chip .dish-star {
+  font-size: 1.12rem;
+  padding: 0.12rem 0.18rem;
+}
+.admin-board-dish-back {
+  display: flex;
+  flex-direction: column;
+}
+.admin-board-dish-back .dish-flip-kicker {
+  margin: 0 0 0.45rem;
+}
+.admin-board-dish-back .field {
+  margin: 0 0 1.05rem;
+  padding: 0.52rem 0.85rem;
+}
+.admin-board-dish-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+.admin-board-dish-actions .chip {
+  min-width: 6.75rem;
+  justify-content: center;
 }
 .admin-add {
   display: grid;

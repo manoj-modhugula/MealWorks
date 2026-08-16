@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Card, DecisionBadge } from "@/components/ui";
-import { ALLERGY_FAMILIES } from "@/lib/matching";
-import { ALLERGY_OPTIONS, AVOID_OPTIONS } from "@/lib/pref-options";
+import { Card } from "@/components/ui";
+import { scheduleFlipArm } from "@/lib/flip-arm";
 
 type MatchItem = {
   name: string;
@@ -20,44 +19,6 @@ export type DishNote = {
 };
 
 type Phase = "stars" | "note" | "sent";
-
-function familyKeyFor(term: string): string {
-  const t = term.toLowerCase().trim();
-  if (!t) return t;
-  if (t === "bean") return "beans";
-  if (ALLERGY_FAMILIES[t]) return t;
-  for (const [k, words] of Object.entries(ALLERGY_FAMILIES)) {
-    if (words.includes(t)) return k === "bean" ? "beans" : k;
-  }
-  return t;
-}
-
-function chipLabel(term: string): string {
-  const key = familyKeyFor(term);
-  const known = [...AVOID_OPTIONS, ...ALLERGY_OPTIONS].find(
-    (o) => o.value === key
-  );
-  if (known) return known.label;
-  return key.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-/** Prefs chips for a skip, without an allergy sentence. */
-function skipChips(reason: string): string[] {
-  const quoted = reason.match(/[“"]([^”"]+)[”"]/);
-  if (quoted?.[1]) return [chipLabel(quoted[1])];
-  if (/vegan/i.test(reason)) return ["Not vegan"];
-  if (/vegetarian|eggetarian|meat\/fish/i.test(reason)) return ["Meat"];
-  return [];
-}
-
-function StarRead({ n }: { n: number }) {
-  return (
-    <span className="dish-stars-read" aria-label={`${n} of 5`}>
-      {"★".repeat(n)}
-      <span className="dish-stars-off">{"★".repeat(5 - n)}</span>
-    </span>
-  );
-}
 
 function StarRow({
   value,
@@ -115,6 +76,7 @@ export function DishCard({
   const faceRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
   const hold = useRef<number | null>(null);
+  const pressing = useRef(false);
   const timers = useRef<number[]>([]);
   const [phase, setPhase] = useState<Phase>("stars");
   const [leaving, setLeaving] = useState(false);
@@ -125,8 +87,6 @@ export function DishCard({
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const [armed, setArmed] = useState(true);
-  const chips =
-    item.decision === "avoid" ? skipChips(item.reason) : [];
   const tint =
     item.decision === "recommended"
       ? "mint"
@@ -217,7 +177,12 @@ export function DishCard({
     const faceH = faceRef.current?.offsetHeight;
     if (faceH) setHeight(faceH);
     onOpen();
-    later(() => setArmed(true), 220);
+    window.getSelection()?.removeAllRanges();
+    scheduleFlipArm({
+      later,
+      holding: () => pressing.current,
+      arm: () => setArmed(true),
+    });
   }
 
   function pickStars(n: number) {
@@ -230,12 +195,12 @@ export function DishCard({
     }, 320);
   }
 
-  async function send() {
+  async function send(text = note) {
     if (!stars || sending || phase !== "note") return;
     setSending(true);
     setErr("");
     try {
-      await onSend(stars, note);
+      await onSend(stars, text);
       setLeaving(true);
       later(() => {
         setPhase("sent");
@@ -258,7 +223,13 @@ export function DishCard({
         if (open) onClose();
         else beginFlip();
       }}
+      onMouseDown={(e) => {
+        const t = e.target as HTMLElement;
+        if (t.closest("input, textarea")) return;
+        e.preventDefault();
+      }}
       onPointerDown={(e) => {
+        pressing.current = true;
         if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
         clearHold();
         hold.current = window.setTimeout(() => {
@@ -266,8 +237,14 @@ export function DishCard({
           else beginFlip();
         }, 260);
       }}
-      onPointerUp={clearHold}
-      onPointerCancel={clearHold}
+      onPointerUp={() => {
+        pressing.current = false;
+        clearHold();
+      }}
+      onPointerCancel={() => {
+        pressing.current = false;
+        clearHold();
+      }}
       onPointerMove={(e) => {
         if (e.pointerType === "touch" || e.pointerType === "pen") {
           if (Math.abs(e.movementX) + Math.abs(e.movementY) > 6) clearHold();
@@ -279,84 +256,73 @@ export function DishCard({
         style={height != null ? { height } : undefined}
       >
       <div className="dish-flip-inner">
-        <Card ref={faceRef} tint={tint} className="dish-flip-face !p-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="font-semibold tracking-tight text-[var(--ink)]">
-                {item.name}
-              </p>
-              <DecisionBadge decision={item.decision} />
-              {noted?.stars ? (
-                <span className="dish-noted" aria-hidden />
-              ) : null}
-            </div>
-            <p className="mt-0.5 text-xs capitalize text-[var(--muted)]">
-              {item.meal} · {item.station}
-            </p>
-            {item.decision === "avoid" ? (
-              chips.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {chips.map((label) => (
-                    <span
-                      key={label}
-                      className="chip pointer-events-none !cursor-default !py-1 !text-xs"
-                      data-active="true"
-                      data-tone="bad"
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              ) : null
-            ) : (
-              <p className="mt-1.5 text-sm leading-snug text-[var(--ink-soft)]">
-                {item.reason}
-              </p>
-            )}
-          </div>
+        <Card ref={faceRef} tint={tint} className="dish-flip-face board-card !p-4">
+          <p className="font-semibold tracking-tight text-[var(--ink)]">
+            {item.name}
+            {noted?.stars ? (
+              <span className="dish-noted ml-2 align-middle" aria-hidden />
+            ) : null}
+          </p>
+          <p className="text-xs capitalize text-[var(--muted)]">
+            {item.meal} · {item.station}
+          </p>
         </Card>
 
         {showBack && (
           <Card
             ref={backRef}
             tint={tint}
-            className="dish-flip-back !p-4"
+            className="dish-flip-back admin-board-dish"
             role="dialog"
             aria-label={`Note on ${item.name}`}
             aria-hidden={!open}
           >
             <div
-              className="dish-flip-back-body"
+              className={
+                phase === "stars"
+                  ? "dish-flip-back-body admin-board-dish-back today-rate-back"
+                  : "dish-flip-back-body admin-board-dish-back"
+              }
               data-armed={armed ? "true" : undefined}
             >
               <p className="dish-flip-kicker">{item.name}</p>
               <div aria-live="polite">
                 {phase === "stars" && (
                   <div
-                    className={leaving ? "dish-wipe-out" : "dish-wipe-in"}
+                    className={
+                      leaving
+                        ? "dish-wipe-out today-rate-foot"
+                        : "dish-wipe-in today-rate-foot"
+                    }
                     key="stars"
                   >
-                    <p className="dish-flip-ask">How was it?</p>
-                    <StarRow value={stars} onPick={pickStars} />
+                    <p className="today-rate-ask">How was it?</p>
+                    <div className="chip today-rate-chip">
+                      <StarRow
+                        value={stars}
+                        onPick={(n) => {
+                          if (!armed) return;
+                          pickStars(n);
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
                 {phase === "note" && (
                   <div
                     className={
-                      leaving ? "dish-wipe-out" : "dish-wipe-in dish-note-form"
+                      leaving ? "dish-wipe-out" : "dish-wipe-in"
                     }
                     key="note"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="dish-flip-ask">A line for the café</p>
-                      <StarRead n={stars} />
-                    </div>
                     <input
-                      className="field !py-1.5"
+                      className="field"
                       maxLength={240}
                       value={note}
-                      autoFocus
-                      placeholder="Short note"
+                      readOnly={!armed}
+                      tabIndex={armed ? 0 : -1}
+                      placeholder="A line for the café"
+                      aria-label="A line for the café"
                       onChange={(e) => setNote(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -368,21 +334,29 @@ export function DishCard({
                     {err && (
                       <p className="text-xs text-[var(--skip-ink)]">{err}</p>
                     )}
-                    <div className="flex items-center gap-2">
+                    <div className="admin-board-dish-actions">
                       <button
                         type="button"
-                        className="btn btn-primary !py-1.5 !text-sm"
+                        className="chip"
+                        disabled={sending}
+                        onClick={() => void send("")}
+                      >
+                        Skip
+                      </button>
+                      <button
+                        type="button"
+                        className="chip"
                         disabled={sending}
                         onClick={() => void send()}
                       >
-                        {sending ? "Sending…" : "Send it over"}
+                        {sending ? "Sending…" : "Send"}
                       </button>
                     </div>
                   </div>
                 )}
                 {phase === "sent" && (
-                  <div className="dish-wipe-in dish-sent" key="sent">
-                    <p className="dish-flip-ask">On its way</p>
+                  <div className="dish-wipe-in" key="sent">
+                    <p className="today-rate-ask">On its way</p>
                   </div>
                 )}
               </div>
