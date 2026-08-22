@@ -65,7 +65,7 @@ Never commit `.env`. Use `.env.example` as the template.
 ### Employee
 
 - **Accounts** — email OTP before the account exists, optional Google/Apple, forgot password, step-up code to change or delete  
-- **Today** — date navigation, week fit, hybrid match (rules + optional AI polish), Good / Maybe / Skip, allergy-aware reasons  
+- **Today** — date navigation, week fit, hybrid match (rules + optional AI polish), Good / Skip, allergy-aware reasons  
 - **Menu** — shared board for the selected day (includes always-on Salad Compose)  
 - **Preferences** — diet, allergies, avoids, likes, soft dislikes, goals, notes  
 - **Settings** — digest schedule, appearance, password (with email code), delete account  

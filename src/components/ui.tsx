@@ -135,7 +135,6 @@ export function DecisionBadge({ decision }: { decision: string }) {
   };
   const label: Record<string, string> = {
     recommended: "Good",
-    caution: "Maybe",
     avoid: "Skip",
   };
   return (
