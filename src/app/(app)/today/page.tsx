@@ -92,9 +92,9 @@ export default function TodayPage() {
     isFallback?: boolean;
   } | null>(cached0?.menu ?? null);
   const [match, setMatch] = useState<MatchData | null>(cached0?.match ?? null);
-  const [filter, setFilter] = useState<
-    "all" | "recommended" | "avoid" | "caution"
-  >("recommended");
+  const [filter, setFilter] = useState<"all" | "recommended" | "avoid">(
+    "recommended"
+  );
   const [hours, setHours] = useState<CafeHours>(DEFAULT_CAFE_HOURS);
   const [meal, setMeal] = useState<MealView>(() =>
     defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS)
@@ -285,9 +285,7 @@ export default function TodayPage() {
   );
   const recCount = scoped.filter((i) => i.decision === "recommended").length;
   const avoidCount = scoped.filter((i) => i.decision === "avoid").length;
-  const maybeCount = scoped.filter((i) => i.decision === "caution").length;
   const dayRec = items.filter((i) => i.decision === "recommended").length;
-  const dayMaybe = items.filter((i) => i.decision === "caution").length;
   const daySkip = items.filter((i) => i.decision === "avoid").length;
 
   const filtered = useMemo(() => {
@@ -385,7 +383,7 @@ export default function TodayPage() {
                   {match.headline}
                 </h2>
                 <p className="mt-1.5 text-[0.9375rem] leading-snug text-[var(--muted)]">
-                  {dayRec} good · {dayMaybe} maybe · {daySkip} skip
+                  {dayRec} good · {daySkip} skip
                 </p>
                 {polishing && (
                   <p className="mt-2 text-xs font-medium text-[var(--muted)]" role="status">
@@ -423,7 +421,6 @@ export default function TodayPage() {
               {(
                 [
                   ["recommended", `Good ${recCount}`],
-                  ["caution", `Maybe ${maybeCount}`],
                   ["avoid", `Skip ${avoidCount}`],
                   ["all", "All"],
                 ] as const
@@ -440,9 +437,7 @@ export default function TodayPage() {
                       ? "good"
                       : id === "avoid"
                         ? "bad"
-                        : id === "caution"
-                          ? "maybe"
-                          : undefined
+                        : undefined
                   }
                   onClick={() => {
                     setOpenNote(null);
