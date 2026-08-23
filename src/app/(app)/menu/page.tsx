@@ -13,6 +13,12 @@ import {
 import { DateNav } from "@/components/date-nav";
 import { todayOnDevice, withDeviceTz } from "@/lib/client-date";
 import { getCache, setCache } from "@/lib/client-cache";
+import {
+  DEFAULT_CAFE_HOURS,
+  MEAL_VIEWS,
+  defaultMealFromHours,
+  type MealView,
+} from "@/lib/meal-hours";
 
 type MenuPack = {
   date: string;
@@ -33,9 +39,9 @@ export default function MenuPage() {
   const [menu, setMenu] = useState<MenuPack | null>(
     cached0 === undefined ? null : cached0
   );
-  const [mealFilter, setMealFilter] = useState<
-    "all" | "breakfast" | "lunch" | "salad"
-  >("all");
+  const [mealFilter, setMealFilter] = useState<MealView>(() =>
+    defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS)
+  );
 
   useEffect(() => {
     const key = `menu:${date}`;
@@ -81,14 +87,10 @@ export default function MenuPage() {
           !st.alwaysOn && String(st.meal).toLowerCase() === "breakfast"
       );
     }
-    if (mealFilter === "lunch") {
-      // Lunch specials + always-on salad bar
-      return all.filter(
-        (st) =>
-          st.alwaysOn || String(st.meal).toLowerCase() === "lunch"
-      );
-    }
-    return all;
+    // Lunch specials + always-on salad bar
+    return all.filter(
+      (st) => st.alwaysOn || String(st.meal).toLowerCase() === "lunch"
+    );
   }, [menu, mealFilter]);
 
   return (
@@ -120,14 +122,7 @@ export default function MenuPage() {
           )}
 
           <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Meal">
-            {(
-              [
-                ["all", "All"],
-                ["breakfast", "Breakfast"],
-                ["lunch", "Lunch"],
-                ["salad", "Salad"],
-              ] as const
-            ).map(([id, label]) => (
+            {MEAL_VIEWS.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"
@@ -161,13 +156,8 @@ export default function MenuPage() {
             {stations.map((st) => (
               <Card key={`${st.meal}-${st.name}`}>
                 <p className="text-[0.68rem] font-bold uppercase tracking-[0.08em] text-[var(--muted)]">
-                  {st.alwaysOn
-                    ? "Always available"
-                    : `${st.meal} · ${st.name}`}
+                  {st.alwaysOn ? st.name : `${st.meal} · ${st.name}`}
                 </p>
-                {st.alwaysOn && (
-                  <p className="card-title mt-1 text-base">Salad Compose</p>
-                )}
                 <ul className="mt-2">
                   {st.items.map((it) => (
                     <li key={it.name} className="dish-line">

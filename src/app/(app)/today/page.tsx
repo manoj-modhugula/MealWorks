@@ -92,9 +92,7 @@ export default function TodayPage() {
     isFallback?: boolean;
   } | null>(cached0?.menu ?? null);
   const [match, setMatch] = useState<MatchData | null>(cached0?.match ?? null);
-  const [filter, setFilter] = useState<"all" | "recommended" | "avoid">(
-    "recommended"
-  );
+  const [filter, setFilter] = useState<"recommended" | "avoid">("recommended");
   const [hours, setHours] = useState<CafeHours>(DEFAULT_CAFE_HOURS);
   const [meal, setMeal] = useState<MealView>(() =>
     defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS)
@@ -289,9 +287,7 @@ export default function TodayPage() {
   const daySkip = items.filter((i) => i.decision === "avoid").length;
 
   const filtered = useMemo(() => {
-    return scoped.filter((i) =>
-      filter === "all" ? true : i.decision === filter
-    );
+    return scoped.filter((i) => i.decision === filter);
   }, [scoped, filter]);
 
   async function sendNote(dishName: string, stars: number, note: string) {
@@ -422,7 +418,6 @@ export default function TodayPage() {
                 [
                   ["recommended", `Good ${recCount}`],
                   ["avoid", `Skip ${avoidCount}`],
-                  ["all", "All"],
                 ] as const
               ).map(([id, text]) => (
                 <button
@@ -432,13 +427,7 @@ export default function TodayPage() {
                   role="radio"
                   aria-checked={filter === id}
                   data-active={filter === id}
-                  data-tone={
-                    id === "recommended"
-                      ? "good"
-                      : id === "avoid"
-                        ? "bad"
-                        : undefined
-                  }
+                  data-tone={id === "recommended" ? "good" : "bad"}
                   onClick={() => {
                     setOpenNote(null);
                     setFilter(id);
