@@ -256,7 +256,7 @@ export function DishCard({
         style={height != null ? { height } : undefined}
       >
       <div className="dish-flip-inner">
-        <Card ref={faceRef} tint={tint} className="dish-flip-face board-card !p-4">
+        <Card ref={faceRef} tint={tint} className="dish-flip-face board-card">
           <p className="font-semibold tracking-tight text-[var(--ink)]">
             {item.name}
             {noted?.stars ? (

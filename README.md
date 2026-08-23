@@ -26,7 +26,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | | |
 |--|--|
-| **Email** | `cafe.admin@example.com` |
+| **Email** | `admin@mealworks.com` |
 | **Password** | Value of `ADMIN_PASSWORD` in `.env` (see `.env.example`) |
 
 Sign in as admin to open the **Admin** suite. Override credentials with `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `ADMIN_NAME`.
