@@ -11,10 +11,12 @@ import * as schema from "./schema";
  * Credentials come from environment variables (see README). Never expose on public UI.
  */
 export const SEED_ADMIN = {
-  email: (process.env.ADMIN_EMAIL || "cafe.admin@example.com").trim().toLowerCase(),
-  password: process.env.ADMIN_PASSWORD || "MenuAdmin@2026",
+  email: (process.env.ADMIN_EMAIL || "admin@mealworks.com").trim().toLowerCase(),
+  password: process.env.ADMIN_PASSWORD || "",
   name: process.env.ADMIN_NAME || "Cafe Admin",
 };
+
+const LEGACY_SEED_EMAIL = "cafe.admin@example.com";
 
 const globalForDb = globalThis as unknown as {
   __mealworksDb?: ReturnType<typeof drizzle<typeof schema>>;
@@ -231,6 +233,23 @@ function seedCafeAdmin(sqlite: Database.Database) {
   const existing = sqlite
     .prepare("SELECT id FROM users WHERE email = ?")
     .get(email) as { id: string } | undefined;
+
+  if (!existing && email !== LEGACY_SEED_EMAIL) {
+    const legacy = sqlite
+      .prepare("SELECT id FROM users WHERE email = ?")
+      .get(LEGACY_SEED_EMAIL) as { id: string } | undefined;
+    if (legacy) {
+      sqlite
+        .prepare(
+          `UPDATE users SET email = ?, name = ?, password_hash = ?, is_admin = 1,
+           email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?`
+        )
+        .run(email, name, hash, now, legacy.id);
+      console.log("[seed] Cafe admin credentials updated");
+      return;
+    }
+  }
+
   if (!existing) {
     const id = randomUUID();
     sqlite

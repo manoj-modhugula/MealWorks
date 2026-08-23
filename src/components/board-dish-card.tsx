@@ -162,7 +162,7 @@ export function BoardDishCard({
         style={height != null ? { height } : undefined}
       >
         <div className="dish-flip-inner">
-          <Card ref={faceRef} className="dish-flip-face board-card !p-4">
+          <Card ref={faceRef} className="dish-flip-face board-card">
             <p className="font-semibold tracking-tight text-[var(--ink)]">
               {dish.name}
             </p>
