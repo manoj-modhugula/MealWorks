@@ -18,6 +18,8 @@ import { WeekStrip } from "@/components/week-strip";
 import { WeekStripSlot } from "@/components/week-strip-slot";
 import { PlateCarousel } from "@/components/plate-carousel";
 import { DishCard, type DishNote } from "@/components/dish-card";
+import { NoteDishPanel } from "@/components/note-dish-panel";
+import { type DishReviewStats } from "@/lib/dish-note";
 import { deviceTimeZone, todayOnDevice, withDeviceTz } from "@/lib/client-date";
 import { getCache, setCache } from "@/lib/client-cache";
 import {
@@ -50,6 +52,20 @@ type MatchData = {
   };
 };
 
+function asReviews(raw: unknown): Record<string, DishReviewStats> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, DishReviewStats> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!v || typeof v !== "object") continue;
+    const rec = v as Partial<DishReviewStats>;
+    out[k] = {
+      avgStars: typeof rec.avgStars === "number" ? rec.avgStars : null,
+      count: typeof rec.count === "number" ? rec.count : 0,
+    };
+  }
+  return out;
+}
+
 function asDishNotes(raw: unknown): Record<string, DishNote> {
   if (!raw || typeof raw !== "object") return {};
   const out: Record<string, DishNote> = {};
@@ -76,6 +92,7 @@ type TodayCache = {
   menu: { id?: string; date: string; isFallback?: boolean } | null;
   match: MatchData | null;
   feedback: Record<string, DishNote>;
+  reviews: Record<string, DishReviewStats>;
   week: { date: string; score: number | null; hasMenu: boolean }[];
 };
 
@@ -101,6 +118,10 @@ export default function TodayPage() {
   const [feedback, setFeedback] = useState<Record<string, DishNote>>(
     cached0?.feedback ?? {}
   );
+  const [reviews, setReviews] = useState<Record<string, DishReviewStats>>(
+    cached0?.reviews ?? {}
+  );
+  const [openNotesDish, setOpenNotesDish] = useState<string | null>(null);
   const [week, setWeek] = useState<
     { date: string; score: number | null; hasMenu: boolean }[]
   >(cached0?.week ?? []);
@@ -114,6 +135,9 @@ export default function TodayPage() {
       isFallback?: boolean;
     } | null;
     setMenu(m);
+    if (data.reviews && typeof data.reviews === "object") {
+      setReviews(asReviews(data.reviews));
+    }
     const raw = data.match as MatchData | null;
     if (!raw) {
       setMatch(null);
@@ -164,6 +188,7 @@ export default function TodayPage() {
         setMenu(cached.menu);
         setMatch(cached.match);
         setFeedback(cached.feedback || {});
+        setReviews(cached.reviews || {});
         setWeek(cached.week || []);
         setLoading(false);
       } else {
@@ -239,6 +264,7 @@ export default function TodayPage() {
             },
           };
         }
+        const nextReviews = asReviews(data.reviews);
         setCache<TodayCache>(
           cacheKey,
           {
@@ -247,6 +273,9 @@ export default function TodayPage() {
             feedback:
               (data.feedback as Record<string, DishNote>) ||
               (cached?.feedback ?? {}),
+            reviews: Object.keys(nextReviews).length
+              ? nextReviews
+              : (cached?.reviews ?? {}),
             week: weekDays,
           },
           3 * 60_000
@@ -270,10 +299,12 @@ export default function TodayPage() {
     mealTouched.current = false;
     setMeal(defaultMealFromHours(new Date(), hours));
     setOpenNote(null);
+    setOpenNotesDish(null);
   }, [date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setOpenNote(null);
+    setOpenNotesDish(null);
   }, [date, filter, meal]);
 
   const items = useMemo(() => match?.payload?.items || [], [match]);
@@ -300,11 +331,32 @@ export default function TodayPage() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Couldn’t send");
     if (data.feedback) {
-      const next = data.feedback as Record<string, DishNote>;
+      const next = asDishNotes(data.feedback);
       setFeedback(next);
+      const nextReviews =
+        data.dish && typeof data.dish === "object"
+          ? {
+              ...reviews,
+              [dishName]: {
+                avgStars:
+                  typeof data.dish.avgStars === "number"
+                    ? data.dish.avgStars
+                    : null,
+                count:
+                  typeof data.dish.count === "number" ? data.dish.count : 0,
+              },
+            }
+          : reviews;
+      if (data.dish && typeof data.dish === "object") setReviews(nextReviews);
       const cacheKey = `today:${date}`;
       const cached = getCache<TodayCache>(cacheKey);
-      if (cached) setCache(cacheKey, { ...cached, feedback: next }, 3 * 60_000);
+      if (cached) {
+        setCache(
+          cacheKey,
+          { ...cached, feedback: next, reviews: nextReviews },
+          3 * 60_000
+        );
+      }
     }
   }
 
@@ -430,6 +482,7 @@ export default function TodayPage() {
                   data-tone={id === "recommended" ? "good" : "bad"}
                   onClick={() => {
                     setOpenNote(null);
+                    setOpenNotesDish(null);
                     setFilter(id);
                   }}
                 >
@@ -446,6 +499,7 @@ export default function TodayPage() {
                   mealTouched.current = true;
                   setMeal(e.target.value as MealView);
                   setOpenNote(null);
+                  setOpenNotesDish(null);
                 }}
               >
                 {MEAL_VIEWS.map((opt) => (
@@ -463,8 +517,16 @@ export default function TodayPage() {
                 key={`${item.station}-${item.name}`}
                 item={item}
                 noted={feedback[item.name]}
+                review={reviews[item.name]}
                 open={openNote === item.name}
-                onOpen={() => setOpenNote(item.name)}
+                onOpen={() => {
+                  setOpenNotesDish(null);
+                  setOpenNote(item.name);
+                }}
+                onNotes={() => {
+                  setOpenNote(null);
+                  setOpenNotesDish(item.name);
+                }}
                 onClose={() => setOpenNote(null)}
                 onSend={(stars, note) => sendNote(item.name, stars, note)}
               />
@@ -472,6 +534,15 @@ export default function TodayPage() {
           </div>
           {filtered.length === 0 && (
             <p className="text-sm text-[var(--muted)]">Nothing in this filter.</p>
+          )}
+          {openNotesDish && menu?.date && (
+            <NoteDishPanel
+              dishName={openNotesDish}
+              date={menu.date}
+              seedAvg={reviews[openNotesDish]?.avgStars}
+              seedCount={reviews[openNotesDish]?.count}
+              onClose={() => setOpenNotesDish(null)}
+            />
           )}
         </div>
       )}

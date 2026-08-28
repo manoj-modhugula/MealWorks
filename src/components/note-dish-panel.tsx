@@ -58,7 +58,7 @@ export function NoteDishPanel({
         const qs = new URLSearchParams({ date, dish: dishName });
         if (starFilter != null) qs.set("stars", String(starFilter));
         if (nextCursor) qs.set("cursor", nextCursor);
-        const res = await fetch(`/api/admin/feedback/dish?${qs}`);
+        const res = await fetch(`/api/feedback/dish?${qs}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Couldn’t load notes");
         setStarCounts(data.starCounts || emptyStarCounts());
@@ -85,7 +85,7 @@ export function NoteDishPanel({
     let live = true;
     setSummary(null);
     void fetch(
-      `/api/admin/feedback/summary?date=${encodeURIComponent(date)}&dish=${encodeURIComponent(dishName)}`
+      `/api/feedback/summary?date=${encodeURIComponent(date)}&dish=${encodeURIComponent(dishName)}`
     )
       .then((r) => r.json())
       .then((data) => {

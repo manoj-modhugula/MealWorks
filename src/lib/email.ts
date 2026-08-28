@@ -56,6 +56,13 @@ export type SendEmailInput = {
   subject: string;
   text: string;
   html: string;
+  attachments?: {
+    filename: string;
+    path?: string;
+    content?: Buffer | string;
+    cid?: string;
+    contentType?: string;
+  }[];
 };
 
 export type SendEmailResult =
@@ -87,6 +94,7 @@ export async function sendEmail(
       subject: input.subject,
       text: input.text,
       html: input.html,
+      attachments: input.attachments,
     });
     return { ok: true, messageId: info.messageId };
   } catch (e) {

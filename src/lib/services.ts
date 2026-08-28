@@ -34,7 +34,7 @@ import {
 import { SAMPLE_MENU } from "./sample-menu";
 import { weekDatesMonFri } from "./dates";
 import { isEmailConfigured, sendEmail } from "./email";
-import { buildDigestEmail } from "./digest-email";
+import { buildDigestEmail, platesFromCombos } from "./digest-email";
 import {
   mergeAlwaysOnStations,
   SALAD_COMPOSE_ITEMS,
@@ -805,8 +805,7 @@ type DigestPayload = {
   headline: string;
   summary: string;
   score: number;
-  recommended: { name: string; reason?: string }[];
-  avoid: { name: string; reason?: string }[];
+  plates: { meal: "breakfast" | "lunch"; items: string[] }[];
 };
 
 function buildDigestPayload(
@@ -825,14 +824,7 @@ function buildDigestPayload(
     headline: match.headline,
     summary: match.summary,
     score: match.score,
-    recommended: match.payload.items
-      .filter((i) => i.decision === "recommended")
-      .slice(0, 8)
-      .map((i) => ({ name: i.name, reason: i.reason })),
-    avoid: match.payload.items
-      .filter((i) => i.decision === "avoid")
-      .slice(0, 8)
-      .map((i) => ({ name: i.name, reason: i.reason })),
+    plates: platesFromCombos(match.payload.combos),
   };
 }
 
@@ -844,7 +836,7 @@ async function deliverDigestEmail(
   const user = getUserById(userId);
   if (!user?.email) return "in_app";
 
-  const mail = buildDigestEmail({
+  const mail = await buildDigestEmail({
     userName: user.name,
     payload: digestPayload,
   });
@@ -853,6 +845,7 @@ async function deliverDigestEmail(
     subject: mail.subject,
     text: mail.text,
     html: mail.html,
+    attachments: mail.attachments,
   });
   if (sent.ok) {
     console.log(`[digest] email ok → ${user.email} (${digestPayload.date})`);

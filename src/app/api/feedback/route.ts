@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getFeedbackMap, upsertDishFeedback } from "@/lib/services";
+import {
+  getFeedbackMap,
+  listMenuFeedback,
+  upsertDishFeedback,
+} from "@/lib/services";
+import { reviewStatsMap } from "@/lib/dish-note";
 import { feedbackSchema } from "@/lib/validation";
 
 export async function GET(req: Request) {
@@ -34,9 +39,17 @@ export async function POST(req: Request) {
     userId: session.user.id,
     ...parsed.data,
   });
+  const stats = reviewStatsMap(listMenuFeedback(parsed.data.menuDayId))[
+    parsed.data.dishName
+  ] || { avgStars: null, count: 0 };
   return NextResponse.json({
     ok: true,
     ...result,
     feedback: getFeedbackMap(session.user.id, parsed.data.menuDayId),
+    dish: {
+      dishName: parsed.data.dishName,
+      avgStars: stats.avgStars,
+      count: stats.count,
+    },
   });
 }

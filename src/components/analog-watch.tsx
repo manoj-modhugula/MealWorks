@@ -70,6 +70,7 @@ export function AnalogWatch({
 
   function onPointerDown(e: React.PointerEvent<SVGSVGElement>) {
     if (e.button !== 0) return;
+    e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     setDragging(true);
     applyPointer(e.clientX, e.clientY);
