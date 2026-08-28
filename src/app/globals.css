@@ -3210,18 +3210,25 @@ select.field {
 }
 .note-slip-voice {
   position: relative;
-  padding-left: 0.85rem;
+  overflow: hidden;
 }
 .note-slip-voice::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: 0.15rem;
-  bottom: 0.15rem;
-  width: 2px;
-  border-radius: 99px;
-  background: var(--accent);
-  opacity: 0.45;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 32%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 12%, transparent) 22%,
+    transparent 52%
+  );
+}
+.note-slip-voice > * {
+  position: relative;
+  z-index: 1;
 }
 
 .admin-rooms {
@@ -3357,17 +3364,21 @@ select.field {
 }
 .note-dish-foot {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
   gap: 0.45rem 0.65rem;
 }
 .note-dish-foot > p {
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .note-dish-stats {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   align-items: center;
   gap: 0.4rem;
   margin-left: auto;
@@ -3376,12 +3387,15 @@ select.field {
   pointer-events: none;
   cursor: default;
   min-height: 1.85rem;
+  min-width: 2.15rem;
+  justify-content: center;
   padding: 0.28rem 0.62rem;
   font-size: 0.75rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 .note-dish-chip-stars {
+  min-width: 4.65rem;
   box-shadow: var(--elevate-1), var(--meal-select-ring);
 }
 .note-dish-chip-stars .dish-stars-read {
@@ -3717,6 +3731,40 @@ select.field {
   transform: none;
   box-shadow: var(--elevate-1);
 }
+.menu-shot {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.menu-shot[data-open="true"] {
+  cursor: zoom-out;
+}
+.menu-shot-img {
+  display: block;
+  margin: 0 auto;
+  width: 100%;
+  height: auto;
+  max-height: 320px;
+  object-fit: contain;
+  transition: max-height 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.menu-shot[data-open="true"] .menu-shot-img {
+  max-height: min(90vh, 1400px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-shot-img {
+    transition: none;
+  }
+}
+.dish-flip:not([data-open="true"]) {
+  cursor: pointer;
+}
 .dish-flip-face.board-card {
   box-sizing: border-box;
   display: flex;
@@ -3746,6 +3794,7 @@ select.field {
   justify-content: space-between;
   gap: 0.45rem 0.65rem;
 }
+
 .today-rate-ask {
   margin: 0;
   font-size: 0.9375rem;
@@ -4005,11 +4054,13 @@ select.field {
   overflow: visible;
   filter: drop-shadow(var(--elevate-1));
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
 }
+.analog-face:focus,
 .analog-face:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: 50%;
+  outline: none;
 }
 .analog-face-disk {
   fill: var(--glass-bg);

@@ -7,10 +7,17 @@ import {
   getFeedbackMap,
   getOrCreateMatch,
   getPrefs,
+  listMenuFeedback,
   matchBaselineOnly,
 } from "@/lib/services";
+import { reviewStatsMap } from "@/lib/dish-note";
 import { getDb, schema } from "@/lib/db";
 import { resolveMenuDate } from "@/lib/utils";
+
+function reviewsForMenu(menuId?: string | null) {
+  if (!menuId) return {};
+  return reviewStatsMap(listMenuFeedback(menuId));
+}
 
 function dateFromRequest(
   userId: string,
@@ -59,6 +66,8 @@ export async function GET(req: Request) {
         resolvedDate: date,
         cached: false,
         phase: "baseline",
+        feedback: getFeedbackMap(session.user.id, quick.menu.id),
+        reviews: reviewsForMenu(quick.menu.id),
         hours: getCafeHours(),
       });
     }
@@ -72,6 +81,7 @@ export async function GET(req: Request) {
       ...result,
       resolvedDate: date,
       feedback,
+      reviews: reviewsForMenu(result.menu?.id),
       timezone: searchParams.get("tz") || getPrefs(session.user.id)?.timezone,
       phase: "full",
       cached: Boolean(result.match),
@@ -121,6 +131,7 @@ export async function POST(req: Request) {
       ...result,
       resolvedDate: date,
       feedback,
+      reviews: reviewsForMenu(result.menu?.id),
       timezone: body.tz || body.timezone || getPrefs(session.user.id)?.timezone,
       phase: "full",
       hours: getCafeHours(),

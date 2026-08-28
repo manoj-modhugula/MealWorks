@@ -2,7 +2,15 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui";
+import {
+  draftFromNoted,
+  type DishNote,
+  type DishReviewStats,
+} from "@/lib/dish-note";
+import { createTapBuffer } from "@/lib/dish-gestures";
 import { scheduleFlipArm } from "@/lib/flip-arm";
+
+export type { DishNote };
 
 type MatchItem = {
   name: string;
@@ -10,12 +18,6 @@ type MatchItem = {
   station: string;
   decision: string;
   reason: string;
-};
-
-export type DishNote = {
-  vote: string;
-  stars: number | null;
-  note: string;
 };
 
 type Phase = "stars" | "note" | "sent";
@@ -60,15 +62,19 @@ function StarRow({
 export function DishCard({
   item,
   noted,
+  review,
   open,
   onOpen,
+  onNotes,
   onClose,
   onSend,
 }: {
   item: MatchItem;
   noted?: DishNote | null;
+  review?: DishReviewStats | null;
   open: boolean;
   onOpen: () => void;
+  onNotes: () => void;
   onClose: () => void;
   onSend: (stars: number, note: string) => Promise<void>;
 }) {
@@ -77,13 +83,16 @@ export function DishCard({
   const backRef = useRef<HTMLDivElement>(null);
   const hold = useRef<number | null>(null);
   const pressing = useRef(false);
+  const skipClick = useRef(false);
   const timers = useRef<number[]>([]);
+  const taps = useRef<ReturnType<typeof createTapBuffer> | null>(null);
+  const draft0 = draftFromNoted(noted);
   const [phase, setPhase] = useState<Phase>("stars");
   const [leaving, setLeaving] = useState(false);
   const [showBack, setShowBack] = useState(false);
   const [height, setHeight] = useState<number | null>(null);
-  const [stars, setStars] = useState(noted?.stars || 0);
-  const [note, setNote] = useState(noted?.note || "");
+  const [stars, setStars] = useState(draft0.stars);
+  const [note, setNote] = useState(draft0.note);
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const [armed, setArmed] = useState(true);
@@ -102,12 +111,27 @@ export function DishCard({
     return id;
   }
 
+  if (!taps.current) {
+    taps.current = createTapBuffer(later, (id) => window.clearTimeout(id));
+  }
+
+  function applyNoted() {
+    const draft = draftFromNoted(noted);
+    setStars(draft.stars);
+    setNote(draft.note);
+    setPhase("stars");
+    setLeaving(false);
+    setSending(false);
+    setErr("");
+  }
+
   useEffect(() => {
     const t = timers;
     const h = hold;
     return () => {
       t.current.forEach((id) => window.clearTimeout(id));
       if (h.current) window.clearTimeout(h.current);
+      taps.current?.cancel();
     };
   }, []);
 
@@ -136,15 +160,18 @@ export function DishCard({
     if (!showBack) return;
     const id = window.setTimeout(() => {
       setShowBack(false);
-      setPhase("stars");
-      setLeaving(false);
-      setStars(0);
-      setNote("");
-      setSending(false);
-      setErr("");
+      applyNoted();
     }, 560);
     return () => window.clearTimeout(id);
-  }, [open, showBack]);
+    // Restore from the latest saved review, not empty local state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, showBack, noted]);
+
+  useEffect(() => {
+    if (open || sending) return;
+    applyNoted();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sending, noted]);
 
   useEffect(() => {
     if (!open) return;
@@ -169,10 +196,19 @@ export function DishCard({
     }
   }
 
+  function startRate() {
+    skipClick.current = true;
+    taps.current?.cancel();
+    later(() => {
+      skipClick.current = false;
+    }, 500);
+    if (open) onClose();
+    else beginFlip();
+  }
+
   function beginFlip() {
     setArmed(false);
-    setPhase("stars");
-    setLeaving(false);
+    applyNoted();
     setShowBack(true);
     const faceH = faceRef.current?.offsetHeight;
     if (faceH) setHeight(faceH);
@@ -220,8 +256,17 @@ export function DishCard({
       data-open={open ? "true" : undefined}
       onContextMenu={(e) => {
         e.preventDefault();
-        if (open) onClose();
-        else beginFlip();
+        startRate();
+      }}
+      onClick={(e) => {
+        if (open) return;
+        if (skipClick.current) {
+          skipClick.current = false;
+          return;
+        }
+        const t = e.target as HTMLElement;
+        if (t.closest("input, textarea, button")) return;
+        taps.current?.tap(onNotes, () => beginFlip());
       }}
       onMouseDown={(e) => {
         const t = e.target as HTMLElement;
@@ -233,8 +278,7 @@ export function DishCard({
         if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
         clearHold();
         hold.current = window.setTimeout(() => {
-          if (open) onClose();
-          else beginFlip();
+          startRate();
         }, 260);
       }}
       onPointerUp={() => {
@@ -259,13 +303,35 @@ export function DishCard({
         <Card ref={faceRef} tint={tint} className="dish-flip-face board-card">
           <p className="font-semibold tracking-tight text-[var(--ink)]">
             {item.name}
-            {noted?.stars ? (
-              <span className="dish-noted ml-2 align-middle" aria-hidden />
+          </p>
+          <div className="note-dish-foot">
+            <p className="text-xs capitalize text-[var(--muted)]">
+              {item.meal} · {item.station}
+            </p>
+            {review && review.count > 0 ? (
+              <div className="note-dish-stats">
+                {review.avgStars != null && (
+                  <span
+                    className="chip note-dish-chip note-dish-chip-stars"
+                    aria-label={`${Math.round(review.avgStars)} of 5`}
+                  >
+                    <span className="dish-stars-read" aria-hidden>
+                      {"★".repeat(Math.round(review.avgStars))}
+                      <span className="dish-stars-off">
+                        {"★".repeat(5 - Math.round(review.avgStars))}
+                      </span>
+                    </span>
+                  </span>
+                )}
+                <span
+                  className="chip note-dish-chip"
+                  aria-label={`${review.count} note${review.count === 1 ? "" : "s"}`}
+                >
+                  {review.count}
+                </span>
+              </div>
             ) : null}
-          </p>
-          <p className="text-xs capitalize text-[var(--muted)]">
-            {item.meal} · {item.station}
-          </p>
+          </div>
         </Card>
 
         {showBack && (
@@ -310,9 +376,7 @@ export function DishCard({
                 )}
                 {phase === "note" && (
                   <div
-                    className={
-                      leaving ? "dish-wipe-out" : "dish-wipe-in"
-                    }
+                    className={leaving ? "dish-wipe-out" : "dish-wipe-in"}
                     key="note"
                   >
                     <input

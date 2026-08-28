@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardList } from "lucide-react";
 import {
   Card,
@@ -19,6 +19,7 @@ import {
   defaultMealFromHours,
   type MealView,
 } from "@/lib/meal-hours";
+import { SHOT_MS, scrollAt } from "@/lib/shot-scroll";
 
 type MenuPack = {
   date: string;
@@ -42,6 +43,9 @@ export default function MenuPage() {
   const [mealFilter, setMealFilter] = useState<MealView>(() =>
     defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS)
   );
+  const [shotOpen, setShotOpen] = useState(false);
+  const shotScroll = useRef(0);
+  const shotAnim = useRef<number | null>(null);
 
   useEffect(() => {
     const key = `menu:${date}`;
@@ -68,6 +72,58 @@ export default function MenuPage() {
       cancelled = true;
     };
   }, [date]);
+
+  useEffect(() => {
+    setShotOpen(false);
+    if (shotAnim.current) window.cancelAnimationFrame(shotAnim.current);
+  }, [date]);
+
+  useEffect(() => {
+    return () => {
+      if (shotAnim.current) window.cancelAnimationFrame(shotAnim.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shotOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeShot();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shotOpen]);
+
+  function reduceMotion() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function openShot() {
+    if (shotAnim.current) window.cancelAnimationFrame(shotAnim.current);
+    shotScroll.current = window.scrollY;
+    setShotOpen(true);
+  }
+
+  function closeShot() {
+    setShotOpen(false);
+    const from = window.scrollY;
+    const to = shotScroll.current;
+    if (reduceMotion() || Math.abs(from - to) < 1) {
+      window.scrollTo(0, to);
+      return;
+    }
+    const start = performance.now();
+    const step = (now: number) => {
+      const y = scrollAt(from, to, now - start, SHOT_MS);
+      window.scrollTo(0, y);
+      if (now - start < SHOT_MS) {
+        shotAnim.current = window.requestAnimationFrame(step);
+      } else {
+        shotAnim.current = null;
+      }
+    };
+    shotAnim.current = window.requestAnimationFrame(step);
+  }
 
   const stations = useMemo(() => {
     if (!menu) return [];
@@ -139,16 +195,27 @@ export default function MenuPage() {
 
           {menu.sourceImagePath && (
             <Card className="!overflow-hidden !p-2">
-              <div className="overflow-hidden rounded-[12px]">
+              <button
+                type="button"
+                className="menu-shot"
+                data-open={shotOpen ? "true" : undefined}
+                aria-expanded={shotOpen}
+                aria-label={
+                  shotOpen
+                    ? "Shrink today’s café menu"
+                    : "Grow today’s café menu"
+                }
+                onClick={() => (shotOpen ? closeShot() : openShot())}
+              >
                 <Image
                   src={menu.sourceImagePath}
                   alt="Today’s café menu"
                   width={1200}
                   height={1200}
-                  className="mx-auto h-auto max-h-[320px] w-full object-contain"
+                  className="menu-shot-img"
                   unoptimized
                 />
-              </div>
+              </button>
             </Card>
           )}
 
