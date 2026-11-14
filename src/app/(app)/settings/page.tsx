@@ -1,7 +1,6 @@
 "use client";
 import { useExperience } from "@/components/experience-provider";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WorkspaceRail } from "@/components/workspace-rail";
 import { EditorDialog } from "@/components/editor-dialog";
@@ -305,7 +304,10 @@ export default function SettingsPage() {
           sections={[
             { id: "appearance", label: "Appearance" },
             { id: "email-delivery", label: "Email delivery" },
-            { id: "your-account", label: "Your account" },
+            {
+              id: isDemo ? "about-demo" : "your-account",
+              label: isDemo ? "About this demo" : "Your account",
+            },
           ]}
         />
         <div className="profile-main">
@@ -444,7 +446,7 @@ export default function SettingsPage() {
               </div>
               <p className="section-description">
                 {isDemo
-                  ? "Try delivery settings here. Create an account to receive emails."
+                  ? "Preview your morning digest here. No emails are sent."
                   : emailEnabled
                     ? "Your day’s best picks, delivered each morning."
                     : "Email delivery is off. Turn it on for your morning picks."}
@@ -587,22 +589,17 @@ export default function SettingsPage() {
           </div>
           <div className="settings-secondary">
             <section
-              id="your-account"
+              id={isDemo ? "about-demo" : "your-account"}
               className="workspace-panel settings-account"
             >
               {isDemo ? (
-                <div className="demo-account">
-                  <h2>Make it yours</h2>
+                <div className="demo-about">
+                  <h2>About this demo</h2>
                   <p className="section-description">
-                    Set up your food profile, keep your preferences and get your
-                    own daily recommendations.
+                    Explore MealWorks with a sample menu. Try food preferences,
+                    dish reviews and digest previews. Your changes stay within
+                    this visit and reset when you reload.
                   </p>
-                  <Link href="/register" className="btn btn-primary">
-                    Create an account
-                  </Link>
-                  <Link href="/login" className="text-action">
-                    Sign in
-                  </Link>
                 </div>
               ) : (
                 <>

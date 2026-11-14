@@ -3096,54 +3096,8 @@ input[type="time"]::-webkit-date-and-time-value {
   }
 }
 
-/* Public sample shares product components; only its entry context is additional. */
-.demo-notice {
-  margin: 18px var(--workspace-gutter) 0;
-  padding: 14px 0 18px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-.demo-label {
-  color: var(--good-ink);
-  font-size: 13px;
-  font-weight: 500;
-}
-.demo-notice p {
-  color: var(--muted);
-  font-size: 13px;
-  margin-top: 3px;
-}
-.demo-entry-actions {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  flex-shrink: 0;
-}
-.demo-entry-actions .btn {
-  min-height: 44px;
-  font-size: 14px;
-  padding: 10px 16px;
-  border-radius: var(--control-radius);
-}
-.demo-account {
+.demo-about {
   max-width: 52ch;
-}
-.demo-account .text-action {
-  margin-left: 22px;
-}
-@media (max-width: 600px) {
-  .demo-notice {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .demo-entry-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
 }
 
 .fit-score-explanation {
