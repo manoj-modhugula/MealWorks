@@ -2152,37 +2152,73 @@ input[type="time"]::-webkit-date-and-time-value {
 .temporary-section h2 svg {
   display: none;
 }
-.menu-photo-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: clamp(260px, 24vw, 320px);
-  grid-auto-rows: 132px;
-  gap: 16px;
+.menu-photo-layout {
+  min-width: 0;
+}
+.menu-photo-masonry {
+  columns: 3;
+  column-gap: 16px;
+  margin: 16px 0 0;
   padding: 0;
-  margin: 0;
   list-style: none;
+}
+.menu-photo-masonry li {
+  display: inline-block;
+  vertical-align: top;
+  width: 100%;
+  margin-bottom: 16px;
+  break-inside: avoid;
 }
 .menu-photo-card {
   position: relative;
+  width: 100%;
   min-width: 0;
-  grid-row: span 2;
+  height: clamp(260px, 24vw, 320px);
+  margin: 0;
   overflow: hidden;
   isolation: isolate;
   border-radius: var(--content-radius);
   background: #334838;
   color: #fff;
 }
-.menu-photo-card[data-featured="true"] {
-  grid-column: 1 / -1;
-  grid-row: 1;
+.menu-photo-masonry .menu-photo-card {
+  height: auto;
+  aspect-ratio: 1.25;
+  min-height: 200px;
+  max-height: 300px;
 }
-.menu-photo-grid:not([data-dish-count="4"])
-  .menu-photo-card:last-child:nth-child(even) {
-  grid-column: 1 / -1;
+.menu-photo-masonry li:nth-child(5n + 2) .menu-photo-card {
+  aspect-ratio: 0.9;
 }
-.menu-photo-grid[data-dish-count="4"] .menu-photo-card:nth-child(n + 3) {
-  grid-column: 2;
-  grid-row: span 1;
+.menu-photo-masonry li:nth-child(5n + 3) .menu-photo-card {
+  aspect-ratio: 1.1;
+}
+.menu-photo-masonry li:nth-child(5n + 4) .menu-photo-card {
+  aspect-ratio: 1.45;
+}
+.menu-photo-masonry li:nth-child(5n) .menu-photo-card {
+  aspect-ratio: 1;
+}
+.menu-photo-masonry[data-count="1"] {
+  columns: 1;
+}
+.menu-photo-masonry[data-count="1"] .menu-photo-card {
+  aspect-ratio: 2.6;
+  max-height: 260px;
+}
+.menu-photo-masonry[data-count="2"],
+.menu-photo-masonry[data-count="3"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+.menu-photo-masonry[data-count="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.menu-photo-masonry[data-count="2"] li,
+.menu-photo-masonry[data-count="3"] li {
+  margin-bottom: 0;
 }
 .menu-dish-image {
   position: absolute;
@@ -2220,30 +2256,55 @@ input[type="time"]::-webkit-date-and-time-value {
   font-size: clamp(22px, 2vw, 26px);
   inset: auto 24px 24px;
 }
-.menu-photo-grid[data-dish-count="4"] .menu-photo-card:nth-child(n + 3) h2 {
-  font-size: 18px;
-  inset: auto 18px 16px;
-}
 .menu-photo-placeholder {
   display: grid;
   place-items: center;
   height: 100%;
   color: rgb(255 255 255 / 65%);
 }
+@media (min-width: 601px) and (max-width: 1050px) {
+  .menu-photo-masonry {
+    columns: 2;
+  }
+  .menu-photo-masonry[data-count="3"] {
+    display: block;
+  }
+  .menu-photo-masonry[data-count="3"] li {
+    margin-bottom: 16px;
+  }
+  .menu-photo-masonry[data-count="1"] {
+    columns: 1;
+  }
+}
 @media (max-width: 600px) {
-  .menu-photo-grid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 240px;
-    grid-auto-rows: 220px;
-    gap: 14px;
+  .menu-photo-layout > .menu-photo-card {
+    height: 240px;
   }
-  .menu-photo-grid .menu-photo-card,
-  .menu-photo-grid[data-dish-count="4"] .menu-photo-card:nth-child(n + 3) {
-    grid-column: 1;
-    grid-row: auto;
+  .menu-photo-masonry,
+  .menu-photo-masonry[data-count="2"],
+  .menu-photo-masonry[data-count="3"] {
+    display: block;
+    columns: 1;
   }
-  .menu-photo-grid .menu-photo-card h2,
-  .menu-photo-grid[data-dish-count="4"] .menu-photo-card:nth-child(n + 3) h2 {
+  .menu-photo-masonry {
+    margin-top: 14px;
+  }
+  .menu-photo-masonry li,
+  .menu-photo-masonry[data-count="2"] li,
+  .menu-photo-masonry[data-count="3"] li {
+    margin-bottom: 14px;
+  }
+  .menu-photo-masonry .menu-photo-card,
+  .menu-photo-masonry[data-count="1"] .menu-photo-card {
+    aspect-ratio: 1.45;
+    min-height: 220px;
+    max-height: 280px;
+  }
+  .menu-photo-masonry li:nth-child(2n) .menu-photo-card {
+    aspect-ratio: 1.25;
+  }
+  .menu-photo-card h2,
+  .menu-photo-card[data-featured="true"] h2 {
     font-size: 20px;
     inset: auto 20px 20px;
   }
