@@ -27,6 +27,43 @@ type MenuPack = {
   };
 };
 
+function MenuDishPhoto({
+  name,
+  featured = false,
+  wide = false,
+}: {
+  name: string;
+  featured?: boolean;
+  wide?: boolean;
+}) {
+  const photo = dishPhoto(name);
+  return (
+    <figure className="menu-photo-card" data-featured={featured}>
+      <div className="menu-dish-image">
+        {photo ? (
+          <Image
+            src={photo}
+            alt=""
+            fill
+            sizes={
+              featured || wide
+                ? "(max-width: 767px) 92vw, 850px"
+                : "(max-width: 600px) 92vw, (max-width: 767px) 45vw, 420px"
+            }
+          />
+        ) : (
+          <span className="menu-photo-placeholder">
+            <Utensils size={28} aria-hidden="true" />
+          </span>
+        )}
+      </div>
+      <figcaption>
+        <h2>{name}</h2>
+      </figcaption>
+    </figure>
+  );
+}
+
 export default function MenuPage() {
   const { requestJson, getCache, setCache } = useExperience();
   const [date, setDate] = useState(() => todayOnDevice());
@@ -152,37 +189,28 @@ export default function MenuPage() {
                       ))}
                     </ul>
                   ) : activeStation.items.length ? (
-                    <ul
-                      className="menu-photo-grid"
-                      aria-label={`${activeStation.name} dishes`}
-                    >
-                      {activeStation.items.map((item, index) => {
-                        const photo = dishPhoto(item.name);
-                        return (
-                          <li key={item.name} data-featured={index === 0}>
-                            <div className="menu-dish-image">
-                              {photo ? (
-                                <Image
-                                  src={photo}
-                                  alt=""
-                                  fill
-                                  sizes={
-                                    index === 0
-                                      ? "(max-width: 767px) 92vw, 850px"
-                                      : "(max-width: 767px) 30vw, 280px"
-                                  }
-                                />
-                              ) : (
-                                <span className="menu-photo-placeholder">
-                                  <Utensils size={28} aria-hidden="true" />
-                                </span>
-                              )}
-                            </div>
-                            <h2>{item.name}</h2>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <div className="menu-photo-layout">
+                      <MenuDishPhoto
+                        name={activeStation.items[0].name}
+                        featured
+                      />
+                      {activeStation.items.length > 1 && (
+                        <ul
+                          className="menu-photo-masonry"
+                          data-count={activeStation.items.length - 1}
+                          aria-label={`More from ${activeStation.name}`}
+                        >
+                          {activeStation.items.slice(1).map((item) => (
+                            <li key={item.name}>
+                              <MenuDishPhoto
+                                name={item.name}
+                                wide={activeStation.items.length === 2}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   ) : (
                     <p className="section-description">
                       No dishes posted at this station.

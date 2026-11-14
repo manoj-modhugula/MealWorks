@@ -2,9 +2,9 @@
 
 Today, Menu, Preferences and Settings share Geist typography, neutral light and dark surfaces, sage selection states, 44px controls and visible keyboard focus. Styles live in `src/app/workspace.css`; shared primitives remain in `src/components/ui.tsx`.
 
-Today combines a meal-choice fit summary with plate ideas. Selecting a dish opens an inline inspector with community notes and a separate review editor. The inspector stays beside the scrolling list on larger viewports and replaces it on phones. Star ratings support keyboard selection, save states and focus restoration.
+Today combines a meal-choice fit summary with plate ideas and a full-photo dish gallery. Native CSS columns arrange mixed card proportions without a layout library. Station, dish name and the current rating sit over a bottom gradient. The gallery uses three columns on desktop, two on tablets and one on phones. Selecting a dish opens an inline inspector with community notes and a separate review editor. The inspector stays beside the scrolling list on larger viewports and replaces it on phones. Star ratings support keyboard selection, save states and focus restoration.
 
-Menu filters the dishes at a selected station. Its first dish is featured above the remaining photos. Missing photos use a neutral placeholder. Small screens place station controls before the dishes and the posted-menu action afterward.
+Menu filters the dishes at a selected station. Its first dish fills a wide feature photo. The remaining dishes use two staggered photo columns with varied aspect ratios and names over the photos, matching the scale and typography of Today cards. Cards keep their own heights instead of stretching to shared row edges. Single- and two-card selections reduce the column count; phones use one column. Missing photos use a neutral placeholder. Small screens place station controls before the dishes and the posted-menu action afterward.
 
 Preferences uses single-choice eating-style radios, optional goal checkboxes and ingredient editors. Apply stages editor changes; Save commits the profile. A Save/Discard bar appears while changes are pending. Temporary restrictions save independently.
 

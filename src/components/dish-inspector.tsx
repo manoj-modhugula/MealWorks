@@ -2,14 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  Star,
-  Utensils,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Check, Star, Utensils, X } from "lucide-react";
 import { Alert, Spinner } from "@/components/ui";
 import { useExperience } from "@/components/experience-provider";
 import {
@@ -31,7 +24,7 @@ type Dish = {
 function DishPhoto({ dish, large = false }: { dish: Dish; large?: boolean }) {
   const src = dishPhoto(dish.name);
   return (
-    <div className={large ? "inspector-photo" : "dish-pick-photo"}>
+    <div className={large ? "inspector-photo" : "dish-tile-photo"}>
       {src ? (
         <Image
           src={src}
@@ -40,7 +33,7 @@ function DishPhoto({ dish, large = false }: { dish: Dish; large?: boolean }) {
           sizes={
             large
               ? "(max-width: 700px) 90vw, 480px"
-              : "(max-width: 700px) 100px, 176px"
+              : "(max-width: 700px) 92vw, (max-width: 1050px) 45vw, 31vw"
           }
         />
       ) : (
@@ -53,7 +46,13 @@ function DishPhoto({ dish, large = false }: { dish: Dish; large?: boolean }) {
   );
 }
 
-function CommunityRating({ review }: { review?: DishReviewStats }) {
+function CommunityRating({
+  review,
+  compact = false,
+}: {
+  review?: DishReviewStats;
+  compact?: boolean;
+}) {
   return (
     <span className="dish-community">
       <Star
@@ -64,10 +63,14 @@ function CommunityRating({ review }: { review?: DishReviewStats }) {
       {review && review.count > 0 ? (
         <>
           <strong>{review.avgStars?.toFixed(1) ?? "—"}</strong>
-          <span>·</span>
-          <span>
-            {review.count} review{review.count === 1 ? "" : "s"}
-          </span>
+          {!compact && (
+            <>
+              <span>·</span>
+              <span>
+                {review.count} review{review.count === 1 ? "" : "s"}
+              </span>
+            </>
+          )}
         </>
       ) : (
         <span>No ratings yet</span>
@@ -119,7 +122,7 @@ export function DishInspectorList({
       data-open={Boolean(active)}
       aria-label="Your dish picks"
     >
-      <div className="dish-picks">
+      <div className="dish-gallery">
         {items.map((dish) => {
           const id = `${dish.station}:${dish.name}`;
           return (
@@ -130,18 +133,17 @@ export function DishInspectorList({
                 else buttons.current.delete(id);
               }}
               type="button"
-              className="dish-pick"
+              className="dish-tile"
               aria-expanded={selected === id}
               aria-controls={selected === id ? "dish-inspector" : undefined}
               onClick={() => setSelected(id)}
             >
               <DishPhoto dish={dish} />
-              <span className="dish-pick-copy">
-                <span className="dish-pick-name">{dish.name}</span>
-                <span className="dish-pick-station">{dish.station}</span>
-                <CommunityRating review={reviews[dish.name]} />
+              <span className="dish-tile-copy">
+                <span className="dish-tile-station">{dish.station}</span>
+                <span className="dish-tile-name">{dish.name}</span>
+                <CommunityRating review={reviews[dish.name]} compact />
               </span>
-              <ChevronRight size={20} aria-hidden="true" />
             </button>
           );
         })}

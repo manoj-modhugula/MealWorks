@@ -49,6 +49,93 @@ describe("public sample workspace", () => {
       )?.decision,
     ).toBe("recommended");
   });
+  it("changes plate photos and order for favorites without faking a fit change", async () => {
+    const demo = createDemoWorkspace();
+    const before = await demo.requestJson<Board>(matchUrl);
+    const lunchPick = (board: Board) =>
+      board.match.payload.combos.find((combo) => combo.title === "Lunch idea")
+        ?.items[0];
+    demo.setCache("today:2026-11-14", before);
+    await demo.requestJson("/api/preferences", put({ likes: ["salmon"] }));
+    expect(demo.getCache("today:2026-11-14")).toBeUndefined();
+    const after = await demo.requestJson<Board>(matchUrl);
+    expect(lunchPick(after)).toBe("Herb-Roasted Salmon");
+    expect(dishPhoto(lunchPick(after)!)).not.toBe(
+      dishPhoto(lunchPick(before)!),
+    );
+    expect(after.match.score).toBe(97);
+    expect(
+      after.match.payload.items.find((item) => item.decision === "recommended")
+        ?.name,
+    ).toBe("Herb-Roasted Salmon");
+  });
+  it("visibly prioritizes vegetable choices when the goal changes", async () => {
+    const demo = createDemoWorkspace();
+    await demo.requestJson(
+      "/api/preferences",
+      put({ goals: ["more_veggies"] }),
+    );
+    const board = await demo.requestJson<Board>(matchUrl);
+    expect(
+      board.match.payload.combos.find((combo) => combo.title === "Lunch idea")
+        ?.items[0],
+    ).toBe("Maple-Roasted Carrots");
+  });
+  it("lowers fit and replaces ineligible plate photos for restrictive eating styles", async () => {
+    const demo = createDemoWorkspace();
+    const before = await demo.requestJson<Board>(matchUrl);
+    await demo.requestJson("/api/preferences", put({ dietType: "vegan" }));
+    const after = await demo.requestJson<Board>(matchUrl);
+    expect(after.match.score).toBeLessThan(before.match.score);
+    const excluded = new Set(
+      after.match.payload.items
+        .filter((item) => item.decision !== "recommended")
+        .map((item) => item.name),
+    );
+    expect(
+      after.match.payload.combos
+        .flatMap((combo) => combo.items)
+        .every((name) => !excluded.has(name)),
+    ).toBe(true);
+    expect(
+      after.match.payload.combos.find((combo) => combo.title === "Lunch idea")
+        ?.items[0],
+    ).not.toBe("Pollo a la Brasa with Aji Verde");
+  });
+  it("keeps exclusions above favorites and makes low-spice goals meaningful", async () => {
+    const demo = createDemoWorkspace();
+    await demo.requestJson(
+      "/api/preferences",
+      put({ likes: ["chicken"], allergies: ["chicken"], goals: ["low_spice"] }),
+    );
+    const board = await demo.requestJson<Board>(matchUrl);
+    expect(
+      board.match.payload.items.find(
+        (item) => item.name === "Pollo a la Brasa with Aji Verde",
+      )?.decision,
+    ).toBe("avoid");
+    expect(
+      board.match.payload.combos.flatMap((combo) => combo.items),
+    ).not.toContain("Pollo a la Brasa with Aji Verde");
+    await demo.requestJson("/api/preferences", put({ allergies: [] }));
+    const mild = await demo.requestJson<Board>(matchUrl);
+    expect(
+      mild.match.payload.items.find(
+        (item) => item.name === "Pollo a la Brasa with Aji Verde",
+      )?.decision,
+    ).toBe("caution");
+  });
+  it("clears plate picks when no dishes remain eligible", async () => {
+    const demo = createDemoWorkspace();
+    const before = await demo.requestJson<Board>(matchUrl);
+    await demo.requestJson(
+      "/api/preferences",
+      put({ hardAvoids: before.match.payload.items.map((item) => item.name) }),
+    );
+    const after = await demo.requestJson<Board>(matchUrl);
+    expect(after.match.score).toBe(0);
+    expect(after.match.payload.combos.flatMap((combo) => combo.items)).toEqual([]);
+  });
   it("isolates preferences and caches between visitors and from the signed-in app", async () => {
     const first = createDemoWorkspace(),
       second = createDemoWorkspace();

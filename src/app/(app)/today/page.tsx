@@ -303,12 +303,16 @@ export default function TodayPage() {
     [items, meal],
   );
   const recCount = scoped.filter((i) => i.decision === "recommended").length;
-  const avoidCount = scoped.filter((i) => i.decision === "avoid").length;
+  const avoidCount = scoped.filter((i) => i.decision !== "recommended").length;
   const dayRec = items.filter((i) => i.decision === "recommended").length;
-  const daySkip = items.filter((i) => i.decision === "avoid").length;
+  const daySkip = items.filter((i) => i.decision !== "recommended").length;
 
   const filtered = useMemo(() => {
-    return scoped.filter((i) => i.decision === filter);
+    return scoped.filter((i) =>
+      filter === "recommended"
+        ? i.decision === "recommended"
+        : i.decision !== "recommended",
+    );
   }, [scoped, filter]);
 
   async function sendNote(dishName: string, stars: number, note: string) {
@@ -426,14 +430,16 @@ export default function TodayPage() {
                   <p className="today-summary-description">{match.summary}</p>
                   <div
                     className="today-fit-summary"
-                    title="Fit reflects the variety of good choices available across meals."
+                    title="Fit measures available choices across meals. Favorites and goals can reorder your picks without changing this score."
                   >
                     <ScoreRing score={match.score} />
                     <div className="today-fit-counts">
                       <p>{dayRec} good</p>
                       <p>{daySkip} skip</p>
                       <span className="fit-score-explanation">
-                        Variety across your meals
+                        {match.score >= 97
+                          ? "Enough choices at every meal"
+                          : "Variety across your meals"}
                       </span>
                     </div>
                   </div>
