@@ -100,7 +100,9 @@ describe("matchMenuLocal", () => {
     );
     const fal = r.items.find((i) => i.name === "Falafel Bowl");
     expect(fal?.decision).toBe("recommended");
-    expect(fal?.reason.toLowerCase()).toMatch(/like|goal/);
+    expect(fal?.reason).toBe("Matches your preference for falafel");
+    expect(r.items[0].name).toBe("Falafel Bowl");
+    expect(r.combos.find((combo) => combo.title === "Lunch idea")?.items[0]).toBe("Falafel Bowl");
   });
 
   it("cautions spicy dishes when the goal is low spice", () => {

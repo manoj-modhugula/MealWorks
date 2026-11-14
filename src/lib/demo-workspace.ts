@@ -19,9 +19,9 @@ const recipeTags: Record<string, string[]> = {
   "Buttermilk Pancakes": ["gluten", "dairy", "egg"],
   "Butter Croissant": ["gluten", "dairy", "pastry"],
   "Belgian Waffle": ["gluten", "dairy", "egg"],
-  "Pollo a la Brasa with Aji Verde": ["chicken", "meat"],
-  "Sofrito Rice": ["vegan", "grain"],
-  "Refried Beans": ["vegan", "beans"],
+  "Pollo a la Brasa with Aji Verde": ["chicken", "meat", "spicy"],
+  "Sofrito Rice": ["vegan", "grain", "mild"],
+  "Refried Beans": ["vegan", "beans", "mild"],
   "Herb-Roasted Salmon": ["fish"],
   "Maple-Roasted Carrots": ["vegan", "vegetable"],
   "Mediterranean Lentil Bowl": ["vegan", "lentils", "vegetable"],
@@ -75,6 +75,12 @@ export function createDemoWorkspace() {
   };
   const feedback: Record<string, Record<string, DishNote>> = {};
   const cache = new Map<string, { value: unknown; expires: number }>();
+  const invalidateRecommendations = () => {
+    cache.delete("prefs");
+    for (const key of cache.keys())
+      if (key.startsWith("today:") || key.startsWith("week:"))
+        cache.delete(key);
+  };
   const json = (data: unknown, status = 200) =>
     new Response(JSON.stringify(data), {
       status,
@@ -122,10 +128,12 @@ export function createDemoWorkspace() {
           ...summary,
           source: "baseline",
           headline:
-            summary.score > 0
+            summary.verdict === "great"
               ? "A few good things for your day"
-              : "A quieter day for your preferences",
-          summary: `${items.filter((item) => item.decision === "recommended").length} dishes match your preferences, from breakfast through lunch.`,
+              : summary.verdict === "mostly_fine"
+                ? "Good choices, with a few trade-offs"
+                : "Fewer choices for your preferences",
+          summary: `${items.filter((item) => item.decision === "recommended").length} dishes match your preferences, from breakfast through lunch. ${items.find((item) => item.decision === "recommended")?.reason ?? "Try adjusting your food profile."}.`,
           payload: {
             items,
             combos: combos.map((combo) => ({
@@ -166,6 +174,7 @@ export function createDemoWorkspace() {
         allowed.filter((key) => key in body).map((key) => [key, body[key]]),
       );
       prefs = { ...prefs, ...patch };
+      invalidateRecommendations();
       return json({ prefs });
     }
     if (path === "/api/preferences/temporary" && method === "POST") {
@@ -183,6 +192,7 @@ export function createDemoWorkspace() {
         ...prefs,
         temporaryRestrictions: [...prefs.temporaryRestrictions, restriction],
       };
+      invalidateRecommendations();
       return json({ ok: true });
     }
     if (path === "/api/preferences/temporary" && method === "DELETE") {
@@ -192,6 +202,7 @@ export function createDemoWorkspace() {
           (item) => item.id !== parsed.searchParams.get("id"),
         ),
       };
+      invalidateRecommendations();
       return json({ ok: true });
     }
     if (path === "/api/me" && method === "GET")

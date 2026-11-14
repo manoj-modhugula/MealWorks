@@ -311,6 +311,24 @@ function dietBlocks(diet: string, tags: string[]): string | null {
 }
 
 
+const GOAL_TERMS: Record<string, string[]> = {
+  high_protein: ["chicken", "egg", "fish", "turkey", "dairy", "beans", "lentils"],
+  more_veggies: ["vegetable", "veggie", "salad"],
+  lighter_meals: ["vegetable", "veggie", "salad", "fruit"],
+  low_spice: ["mild"],
+};
+const GOAL_NAMES: Record<string, string> = {
+  high_protein: "high-protein",
+  more_veggies: "more-veggies",
+  lighter_meals: "lighter-meals",
+  low_spice: "low-spice",
+};
+function matchingGoals(name: string, tags: string[], goals: string[]) {
+  return goals.filter((goal) =>
+    (GOAL_TERMS[goal] ?? []).some((term) => dishHitsTerm(name, tags, term)),
+  );
+}
+
 const HEADLINES: Record<Verdict, string> = {
   great: "Great day for you at the café",
   mostly_fine: "Mostly fine: a few things to skip",
@@ -379,19 +397,14 @@ export function matchMenuLocal(
         ) {
           decision = "caution";
           reason = "Heavier than your lighter-meals goal";
-        } else if (
-          likes.some((t) => dishHitsTerm(item.name, tags, t)) ||
-          (goals.includes("high_protein") &&
-            tags.some((t) =>
-              ["chicken", "egg", "fish", "turkey", "dairy"].includes(t)
-            )) ||
-          (goals.includes("more_veggies") &&
-            tags.some((t) =>
-              ["vegetable", "veggie", "salad", "vegan"].includes(t)
-            ))
-        ) {
-          decision = "recommended";
-          reason = "Aligned with your likes or goals";
+        } else {
+          const favorite = likes.find((term) =>
+            dishHitsTerm(item.name, tags, term),
+          );
+          const alignedGoals = matchingGoals(item.name, tags, goals);
+          if (favorite) reason = `Matches your preference for ${favorite}`;
+          else if (alignedGoals.length)
+            reason = `Fits your ${alignedGoals.map((goal) => GOAL_NAMES[goal]).join(" and ")} goal`;
         }
 
         items.push({
@@ -405,6 +418,19 @@ export function matchMenuLocal(
       }
     }
   }
+
+  // Rank eligible dishes before building plate ideas; exclusions always win.
+  const priority = new Map(
+    items.map((item) => [
+      item,
+      item.decision === "recommended"
+        ? (likes.some((term) => dishHitsTerm(item.name, item.tags ?? [], term))
+            ? 8
+            : 0) + matchingGoals(item.name, item.tags ?? [], goals).length
+        : 0,
+    ]),
+  );
+  items.sort((a, b) => priority.get(b)! - priority.get(a)!);
 
   const { score, verdict, recommended } = scoreFromItems(items);
   const combos = buildPlateIdeas(items);
