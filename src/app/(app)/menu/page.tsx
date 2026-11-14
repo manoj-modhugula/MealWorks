@@ -30,9 +30,11 @@ type MenuPack = {
 function MenuDishPhoto({
   name,
   featured = false,
+  wide = false,
 }: {
   name: string;
   featured?: boolean;
+  wide?: boolean;
 }) {
   const photo = dishPhoto(name);
   return (
@@ -44,9 +46,9 @@ function MenuDishPhoto({
             alt=""
             fill
             sizes={
-              featured
+              featured || wide
                 ? "(max-width: 767px) 92vw, 850px"
-                : "(max-width: 600px) 92vw, (max-width: 1050px) 45vw, 280px"
+                : "(max-width: 600px) 92vw, (max-width: 767px) 45vw, 420px"
             }
           />
         ) : (
@@ -200,7 +202,10 @@ export default function MenuPage() {
                         >
                           {activeStation.items.slice(1).map((item) => (
                             <li key={item.name}>
-                              <MenuDishPhoto name={item.name} />
+                              <MenuDishPhoto
+                                name={item.name}
+                                wide={activeStation.items.length === 2}
+                              />
                             </li>
                           ))}
                         </ul>
