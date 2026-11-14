@@ -154,12 +154,17 @@ export default function MenuPage() {
                   ) : activeStation.items.length ? (
                     <ul
                       className="menu-photo-grid"
+                      data-dish-count={activeStation.items.length}
                       aria-label={`${activeStation.name} dishes`}
                     >
                       {activeStation.items.map((item, index) => {
                         const photo = dishPhoto(item.name);
                         return (
-                          <li key={item.name} data-featured={index === 0}>
+                          <li
+                            key={item.name}
+                            className="menu-photo-card"
+                            data-featured={index === 0}
+                          >
                             <div className="menu-dish-image">
                               {photo ? (
                                 <Image
@@ -169,7 +174,7 @@ export default function MenuPage() {
                                   sizes={
                                     index === 0
                                       ? "(max-width: 767px) 92vw, 850px"
-                                      : "(max-width: 767px) 30vw, 280px"
+                                      : "(max-width: 600px) 92vw, (max-width: 767px) 45vw, 420px"
                                   }
                                 />
                               ) : (
