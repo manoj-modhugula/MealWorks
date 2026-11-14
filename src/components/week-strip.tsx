@@ -190,7 +190,7 @@ export function WeekStrip({
       markHighlight(raw);
       if (m.raf == null) m.raf = requestAnimationFrame(tickFollow);
     },
-    [markHighlight, measureAll, nearestWithMenu, tickFollow]
+    [markHighlight, measureAll, tickFollow]
   );
 
   const detachWin = useCallback(() => {

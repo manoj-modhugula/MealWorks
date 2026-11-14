@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { deviceTimeZone } from "@/lib/client-date";
@@ -13,9 +14,11 @@ function lastKey(userId: string) {
  * A city they picked in Settings is left alone.
  */
 export function TimezoneSync() {
+  const pathname = usePathname();
   const { data: session, status } = useSession();
 
   useEffect(() => {
+    if (pathname.startsWith("/demo")) return;
     if (status !== "authenticated" || !session?.user?.id) return;
 
     const tz = deviceTimeZone();
@@ -56,7 +59,7 @@ export function TimezoneSync() {
     return () => {
       cancelled = true;
     };
-  }, [status, session?.user?.id]);
+  }, [status, session?.user?.id, pathname]);
 
   return null;
 }

@@ -147,8 +147,7 @@ export function writeThemeStorage(storage: ThemeStorage): void {
 /** Human status for schedule mode. */
 export function scheduleStatusLine(
   schedule: ThemeSchedule,
-  resolved: ResolvedTheme,
-  date = new Date()
+  resolved: ResolvedTheme
 ): string {
   const dark = resolved === "dark";
   const nextLabel = dark ? schedule.darkTo : schedule.darkFrom;

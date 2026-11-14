@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import Image from "next/image";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { dishPhoto } from "@/lib/sample-catalog";
 import { cn } from "@/lib/utils";
 
 export type PlateCard = {
@@ -11,10 +13,7 @@ export type PlateCard = {
   itemReasons?: string[];
 };
 
-/**
- * Cylinder / cover-flow: center card full, left & right half-peek + soft blur.
- * Tap side (or chevrons) to rotate.
- */
+/** Three meal ideas with the selected card centered and adjacent cards visible. */
 const SLOT_ORDER = ["Breakfast idea", "Lunch idea", "Salad bowl"] as const;
 /** Hard cap so fixed-height cards never crop a 4th/5th line */
 const MAX_ITEMS_PER_CARD = 3;
@@ -24,7 +23,7 @@ function normalizeSlots(combos: PlateCard[]): PlateCard[] {
     const found = combos.find(
       (c) =>
         c.title === title ||
-        c.title.toLowerCase().includes(title.split(" ")[0].toLowerCase())
+        c.title.toLowerCase().includes(title.split(" ")[0].toLowerCase()),
     );
     if (found) {
       return {
@@ -47,8 +46,10 @@ function normalizeSlots(combos: PlateCard[]): PlateCard[] {
 
 export function PlateCarousel({
   combos,
+  headerAction,
 }: {
   combos: PlateCard[];
+  headerAction?: ReactNode;
 }) {
   const slots = normalizeSlots(combos);
   const n = slots.length; // always 3
@@ -59,7 +60,7 @@ export function PlateCarousel({
     (dir: -1 | 1) => {
       setActive((i) => (i + dir + n) % n);
     },
-    [n]
+    [n],
   );
 
   // Relative position: -1 left, 0 center, +1 right (shortest wrap)
@@ -72,8 +73,14 @@ export function PlateCarousel({
 
   return (
     <div className="plate-carousel">
-      <div className="px-1 mb-4">
-        <h2 className="card-title">Plate ideas</h2>
+      <div className="px-1 mb-4 plate-carousel-heading">
+        <div className="plate-carousel-intro">
+          <h2 className="card-title">Plate ideas</h2>
+          <p className="section-description" style={{ margin: "6px 0 0" }}>
+            A few good things, together.
+          </p>
+        </div>
+        {headerAction}
       </div>
       <div
         className="plate-carousel-stage card"
@@ -89,19 +96,25 @@ export function PlateCarousel({
           rotate(dx < 0 ? 1 : -1);
         }}
       >
-        {/* Inner track = carousel only; outer uses same .card chrome as score card */}
+        {/* Keep card movement inside the clipped track. */}
         <div className="plate-carousel-track">
           {slots.map((c, i) => {
             const r = rel(i);
             const role =
-              r === 0 ? "center" : r === -1 ? "left" : r === 1 ? "right" : "hidden";
+              r === 0
+                ? "center"
+                : r === -1
+                  ? "left"
+                  : r === 1
+                    ? "right"
+                    : "hidden";
             return (
               <button
                 key={c.title}
                 type="button"
                 className={cn("plate-carousel-card", `is-${role}`)}
                 data-role={role}
-                tabIndex={role === "center" ? 0 : -1}
+                tabIndex={0}
                 aria-current={role === "center" ? "true" : undefined}
                 aria-label={`${c.title}${role === "center" ? " (selected)" : ", bring to center"}`}
                 onClick={() => {
@@ -110,6 +123,15 @@ export function PlateCarousel({
                 }}
               >
                 <div className="plate-carousel-card-inner card">
+                  {dishPhoto(c.items[0] ?? "") && (
+                    <Image
+                      className="plate-photo"
+                      src={dishPhoto(c.items[0])!}
+                      alt=""
+                      fill
+                      sizes="(max-width: 767px) 80vw, (max-width: 1280px) 48vw, 560px"
+                    />
+                  )}
                   <p className="card-title">{c.title}</p>
                   {c.items.length === 0 ? (
                     <p className="mt-2 text-sm text-[var(--muted)]">
@@ -129,6 +151,9 @@ export function PlateCarousel({
         </div>
       </div>
 
+      <p className="sr-only">
+        Food photography is illustrative. Plate suggestions use today’s menu.
+      </p>
       <div className="plate-carousel-controls">
         <button
           type="button"
@@ -138,13 +163,16 @@ export function PlateCarousel({
         >
           <ChevronLeft size={18} strokeWidth={2} />
         </button>
-        <div className="plate-carousel-dots" role="tablist" aria-label="Plate ideas">
+        <div
+          className="plate-carousel-dots"
+          role="group"
+          aria-label="Choose a plate idea"
+        >
           {slots.map((c, i) => (
             <button
               key={c.title}
               type="button"
-              role="tab"
-              aria-selected={i === active}
+              aria-pressed={i === active}
               className="plate-carousel-dot"
               data-active={i === active}
               onClick={() => setActive(i)}

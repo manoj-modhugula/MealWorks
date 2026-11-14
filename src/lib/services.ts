@@ -1,4 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
+import { scoreFromItems } from "./fit-score";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { getDb, schema } from "./db";
@@ -612,13 +613,15 @@ export function weekFitScores(userId: string, anchorDate: string) {
       )
       .get();
     if (cached) {
+      const payload = safeJsonParse<MatchPayload | null>(cached.payloadJson, null);
+      const fit = scoreFromItems(payload?.items || []);
       return {
         date,
-        score: cached.score,
+        score: fit.score,
         hasMenu: true,
-        rec: 0,
-        total: 0,
-        verdict: cached.verdict,
+        rec: fit.recommended,
+        total: payload?.items?.length || 0,
+        verdict: fit.verdict,
       };
     }
     const local = matchMenuLocal(pack.menu, prefs, temps);
@@ -1096,7 +1099,7 @@ export function getMenuForDate(date: string) {
     .where(eq(schema.menuItems.menuDayId, day.id))
     .all();
 
-  const raw = safeJsonParse<StructuredMenu & { _meta?: unknown }>(day.rawModelJson, {
+  const raw = safeJsonParse<StructuredMenu & { _meta?: { extractionSource?: string; previewCatalog?: boolean } }>(day.rawModelJson, {
     date: day.date,
     meals: [],
   });
@@ -1132,11 +1135,11 @@ export function getMenuForDate(date: string) {
       return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
     });
 
-  // Salad Compose is always on and is not from the photo.
-  const structured = mergeAlwaysOnStations({
-    date: day.date,
-    meals,
-  } as StructuredMenu);
+  // Posted sample catalogs include finished salads; regular menus include the ingredient bar.
+  const posted = { date: day.date, meals } as StructuredMenu;
+  const structured = raw._meta?.previewCatalog
+    ? posted
+    : mergeAlwaysOnStations(posted);
 
   return {
     id: day.id,
@@ -1190,16 +1193,29 @@ export async function getOrCreateMatch(userId: string, date = todayISO()) {
       const cleanSummary = scrubLegacyAiErrorSummary(
         existing.summary || payload.summary
       );
+      const fit = scoreFromItems(payload.items || []);
+      const scoredPayload = {
+        ...payload,
+        score: fit.score,
+        verdict: fit.verdict,
+        summary: cleanSummary,
+      };
+      if (existing.score !== fit.score || existing.verdict !== fit.verdict) {
+        db.update(schema.matchResults)
+          .set({ score: fit.score, verdict: fit.verdict, payloadJson: JSON.stringify(scoredPayload) })
+          .where(eq(schema.matchResults.id, existing.id))
+          .run();
+      }
       return {
         menu: menuPack,
         preferredDate,
         match: {
           id: existing.id,
-          verdict: existing.verdict,
-          score: existing.score,
+          verdict: fit.verdict,
+          score: fit.score,
           headline: existing.headline,
           summary: cleanSummary,
-          payload: { ...payload, summary: cleanSummary },
+          payload: scoredPayload,
           source: payload.source || "baseline",
           aiStatus: payload.aiStatus,
           createdAt: existing.createdAt,

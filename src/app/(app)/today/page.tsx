@@ -1,15 +1,14 @@
 "use client";
+import { useExperience } from "@/components/experience-provider";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Utensils } from "lucide-react";
+import { RotateCw, Utensils } from "lucide-react";
 import {
   Alert,
-  BookLoader,
   Card,
   EmptyState,
   Page,
-  PageHeader,
   PageSkeleton,
   ScoreRing,
 } from "@/components/ui";
@@ -17,11 +16,10 @@ import { DateNav } from "@/components/date-nav";
 import { WeekStrip } from "@/components/week-strip";
 import { WeekStripSlot } from "@/components/week-strip-slot";
 import { PlateCarousel } from "@/components/plate-carousel";
-import { DishCard, type DishNote } from "@/components/dish-card";
-import { NoteDishPanel } from "@/components/note-dish-panel";
+import { DishInspectorList } from "@/components/dish-inspector";
+import { type DishNote } from "@/lib/dish-note";
 import { type DishReviewStats } from "@/lib/dish-note";
 import { deviceTimeZone, todayOnDevice, withDeviceTz } from "@/lib/client-date";
-import { getCache, setCache } from "@/lib/client-cache";
 import {
   DEFAULT_CAFE_HOURS,
   MEAL_VIEWS,
@@ -97,6 +95,7 @@ type TodayCache = {
 };
 
 export default function TodayPage() {
+  const { fetch, getCache, setCache, isDemo } = useExperience();
   const [date, setDate] = useState(() => todayOnDevice());
   const cached0 = getCache<TodayCache>(`today:${todayOnDevice()}`);
   const [loading, setLoading] = useState(!cached0?.match && !cached0?.menu);
@@ -112,20 +111,18 @@ export default function TodayPage() {
   const [filter, setFilter] = useState<"recommended" | "avoid">("recommended");
   const [hours, setHours] = useState<CafeHours>(DEFAULT_CAFE_HOURS);
   const [meal, setMeal] = useState<MealView>(() =>
-    defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS)
+    defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS),
   );
   const mealTouched = useRef(false);
   const [feedback, setFeedback] = useState<Record<string, DishNote>>(
-    cached0?.feedback ?? {}
+    cached0?.feedback ?? {},
   );
   const [reviews, setReviews] = useState<Record<string, DishReviewStats>>(
-    cached0?.reviews ?? {}
+    cached0?.reviews ?? {},
   );
-  const [openNotesDish, setOpenNotesDish] = useState<string | null>(null);
   const [week, setWeek] = useState<
     { date: string; score: number | null; hasMenu: boolean }[]
   >(cached0?.week ?? []);
-  const [openNote, setOpenNote] = useState<string | null>(null);
   const [weekOpen, setWeekOpen] = useState(false);
 
   const applyPayload = useCallback((data: Record<string, unknown>) => {
@@ -202,7 +199,7 @@ export default function TodayPage() {
       try {
         if (!rematch) {
           const baseRes = await fetch(
-            withDeviceTz("/api/match/today", { date: d, phase: "baseline" })
+            withDeviceTz("/api/match/today", { date: d, phase: "baseline" }),
           );
           const baseData = await baseRes.json();
           if (baseRes.ok && baseData.menu) {
@@ -222,14 +219,14 @@ export default function TodayPage() {
               ? { "Content-Type": "application/json" }
               : undefined,
             body: rematch ? JSON.stringify({ date: d, tz }) : undefined,
-          }
+          },
         );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load");
         applyPayload(data);
 
         const w = await fetch(withDeviceTz("/api/week", { date: d })).then(
-          (r) => r.json()
+          (r) => r.json(),
         );
         const weekDays = w.days || [];
         setWeek(weekDays);
@@ -278,7 +275,7 @@ export default function TodayPage() {
               : (cached?.reviews ?? {}),
             week: weekDays,
           },
-          3 * 60_000
+          3 * 60_000,
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load");
@@ -288,7 +285,7 @@ export default function TodayPage() {
         setBookBusy(false);
       }
     },
-    [applyPayload, date]
+    [applyPayload, date, fetch, getCache, setCache],
   );
 
   useEffect(() => {
@@ -298,19 +295,12 @@ export default function TodayPage() {
   useEffect(() => {
     mealTouched.current = false;
     setMeal(defaultMealFromHours(new Date(), hours));
-    setOpenNote(null);
-    setOpenNotesDish(null);
   }, [date]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    setOpenNote(null);
-    setOpenNotesDish(null);
-  }, [date, filter, meal]);
 
   const items = useMemo(() => match?.payload?.items || [], [match]);
   const scoped = useMemo(
     () => items.filter((i) => itemInMealView(i, meal)),
-    [items, meal]
+    [items, meal],
   );
   const recCount = scoped.filter((i) => i.decision === "recommended").length;
   const avoidCount = scoped.filter((i) => i.decision === "avoid").length;
@@ -354,45 +344,47 @@ export default function TodayPage() {
         setCache(
           cacheKey,
           { ...cached, feedback: next, reviews: nextReviews },
-          3 * 60_000
+          3 * 60_000,
         );
       }
     }
   }
 
-  const label = match
-    ? verdictLabel[match.verdict] || "Your day"
-    : "Today";
+  const label = isDemo
+    ? "Today’s selection"
+    : match
+      ? verdictLabel[match.verdict] || "Your day"
+      : "Today";
+
+  const dateControls = (
+    <div className="today-date-controls">
+      <DateNav
+        date={date}
+        onChange={setDate}
+        maxDate={todayOnDevice()}
+        onHold={() => setWeekOpen((v) => !v)}
+      />
+      <button
+        type="button"
+        className="icon-btn book-refresh-btn"
+        aria-label={bookBusy ? "Refreshing match" : "Refresh match"}
+        disabled={bookBusy}
+        onClick={() => load({ rematch: true })}
+      >
+        <RotateCw
+          size={18}
+          className={bookBusy ? "refresh-spinning" : undefined}
+        />
+      </button>
+    </div>
+  );
 
   return (
-    <Page>
-      <PageHeader
-        title="Today"
-        subtitle={
-          menu?.isFallback
-            ? `Latest posted · ${menu.date}`
-            : menu?.date || undefined
-        }
-        action={
-          <>
-            <DateNav
-              date={date}
-              onChange={setDate}
-              maxDate={todayOnDevice()}
-              onHold={() => setWeekOpen((v) => !v)}
-            />
-            <button
-              type="button"
-              className="icon-btn book-refresh-btn"
-              aria-label={bookBusy ? "Refreshing match" : "Refresh match"}
-              disabled={bookBusy}
-              onClick={() => load({ rematch: true })}
-            >
-              <BookLoader label="" compact flipping={bookBusy} />
-            </button>
-          </>
-        }
-      />
+    <Page className="today-page">
+      <h1 className="sr-only">Today</h1>
+      {!match?.payload.combos?.length && (
+        <div className="today-context-toolbar">{dateControls}</div>
+      )}
 
       {week.length > 0 && (
         <WeekStripSlot open={weekOpen}>
@@ -410,7 +402,10 @@ export default function TodayPage() {
           title="No menu yet"
           body="Usually up by mid-morning. Check again after the café posts."
           action={
-            <Link href="/menu" className="btn btn-secondary">
+            <Link
+              href={isDemo ? "/demo/menu" : "/menu"}
+              className="btn btn-secondary"
+            >
               Open menu
             </Link>
           }
@@ -418,48 +413,68 @@ export default function TodayPage() {
       )}
 
       {menu && match && (
-        <div className="animate-in space-y-5">
+        <div className="animate-in today-content">
           {/* Hero */}
-          <Card className="!p-5 sm:!p-6">
-            <div className="flex flex-wrap items-center gap-5">
-              <ScoreRing score={match.score} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[var(--accent-ink)]">
-                  {label}
-                </p>
-                <h2 className="font-display mt-1 text-[1.35rem] font-semibold tracking-tight text-[var(--ink)] sm:text-[1.55rem]">
-                  {match.headline}
-                </h2>
-                <p className="mt-1.5 text-[0.9375rem] leading-snug text-[var(--muted)]">
-                  {dayRec} good · {daySkip} skip
-                </p>
-                {polishing && (
-                  <p className="mt-2 text-xs font-medium text-[var(--muted)]" role="status">
-                    Updating…
+          <div className="today-overview">
+            <Card className="today-summary">
+              <div className="today-summary-layout">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--accent-ink)]">
+                    {label}
                   </p>
-                )}
-                {menu.isFallback && (
-                  <p className="mt-1 text-xs text-[var(--caution-ink)]">
-                    No menu this day, showing the latest board.
-                  </p>
-                )}
-                {match.source === "baseline" && !polishing && (
-                  <button
-                    type="button"
-                    className="mt-2 text-xs font-semibold text-[var(--accent)]"
-                    onClick={() => load({ rematch: true })}
+                  <h2 className="today-headline">{match.headline}</h2>
+                  <p className="today-summary-description">{match.summary}</p>
+                  <div
+                    className="today-fit-summary"
+                    title="Fit reflects the variety of good choices available across meals."
                   >
-                    Refresh match
-                  </button>
-                )}
+                    <ScoreRing score={match.score} />
+                    <div className="today-fit-counts">
+                      <p>{dayRec} good</p>
+                      <p>{daySkip} skip</p>
+                      <span className="fit-score-explanation">
+                        Variety across your meals
+                      </span>
+                    </div>
+                  </div>
+                  {polishing && (
+                    <p
+                      className="mt-2 text-xs font-medium text-[var(--muted)]"
+                      role="status"
+                    >
+                      Updating…
+                    </p>
+                  )}
+                  {!menu.isFallback && (
+                    <p className="today-summary-footnote">
+                      Choose a dish below for ratings, notes and your review.
+                    </p>
+                  )}
+                  {menu.isFallback && (
+                    <p className="mt-1 text-xs text-[var(--caution-ink)]">
+                      No menu this day, showing the latest board.
+                    </p>
+                  )}
+                  {!isDemo && match.source === "baseline" && !polishing && (
+                    <button
+                      type="button"
+                      className="mt-2 text-xs font-semibold text-[var(--accent)]"
+                      onClick={() => load({ rematch: true })}
+                    >
+                      Refresh match
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
 
-          {match.payload.combos?.length > 0 && (
-            <PlateCarousel combos={match.payload.combos} />
-          )}
-
+            {match.payload.combos?.length > 0 && (
+              <PlateCarousel
+                headerAction={dateControls}
+                combos={match.payload.combos}
+              />
+            )}
+          </div>
           <div className="today-filter-row">
             <div
               className="today-filter-chips"
@@ -481,8 +496,6 @@ export default function TodayPage() {
                   data-active={filter === id}
                   data-tone={id === "recommended" ? "good" : "bad"}
                   onClick={() => {
-                    setOpenNote(null);
-                    setOpenNotesDish(null);
                     setFilter(id);
                   }}
                 >
@@ -498,8 +511,6 @@ export default function TodayPage() {
                 onChange={(e) => {
                   mealTouched.current = true;
                   setMeal(e.target.value as MealView);
-                  setOpenNote(null);
-                  setOpenNotesDish(null);
                 }}
               >
                 {MEAL_VIEWS.map((opt) => (
@@ -511,39 +522,14 @@ export default function TodayPage() {
             </div>
           </div>
 
-          <div className="card-grid-2">
-            {filtered.map((item) => (
-              <DishCard
-                key={`${item.station}-${item.name}`}
-                item={item}
-                noted={feedback[item.name]}
-                review={reviews[item.name]}
-                open={openNote === item.name}
-                onOpen={() => {
-                  setOpenNotesDish(null);
-                  setOpenNote(item.name);
-                }}
-                onNotes={() => {
-                  setOpenNote(null);
-                  setOpenNotesDish(item.name);
-                }}
-                onClose={() => setOpenNote(null)}
-                onSend={(stars, note) => sendNote(item.name, stars, note)}
-              />
-            ))}
-          </div>
-          {filtered.length === 0 && (
-            <p className="text-sm text-[var(--muted)]">Nothing in this filter.</p>
-          )}
-          {openNotesDish && menu?.date && (
-            <NoteDishPanel
-              dishName={openNotesDish}
-              date={menu.date}
-              seedAvg={reviews[openNotesDish]?.avgStars}
-              seedCount={reviews[openNotesDish]?.count}
-              onClose={() => setOpenNotesDish(null)}
-            />
-          )}
+          <DishInspectorList
+            key={`${date}:${meal}:${filter}`}
+            items={filtered}
+            feedback={feedback}
+            reviews={reviews}
+            date={menu.date}
+            onSend={sendNote}
+          />
         </div>
       )}
     </Page>

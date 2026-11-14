@@ -1,29 +1,23 @@
 "use client";
-
+import { useExperience } from "@/components/experience-provider";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ClipboardList } from "lucide-react";
-import {
-  Card,
-  EmptyState,
-  Page,
-  PageHeader,
-  PageSkeleton,
-} from "@/components/ui";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowUpRight, ClipboardList, Utensils } from "lucide-react";
+import { Alert, EmptyState, Page, PageSkeleton } from "@/components/ui";
+import { EditorDialog } from "@/components/editor-dialog";
 import { DateNav } from "@/components/date-nav";
 import { todayOnDevice, withDeviceTz } from "@/lib/client-date";
-import { getCache, setCache } from "@/lib/client-cache";
+import { dishPhoto } from "@/lib/sample-catalog";
 import {
   DEFAULT_CAFE_HOURS,
   MEAL_VIEWS,
   defaultMealFromHours,
   type MealView,
 } from "@/lib/meal-hours";
-import { SHOT_MS, scrollAt } from "@/lib/shot-scroll";
-
 type MenuPack = {
   date: string;
   sourceImagePath?: string | null;
+  meta?: { previewCatalog?: boolean };
   isFallback?: boolean;
   menu: {
     meals: {
@@ -34,212 +28,228 @@ type MenuPack = {
 };
 
 export default function MenuPage() {
+  const { requestJson, getCache, setCache } = useExperience();
   const [date, setDate] = useState(() => todayOnDevice());
-  const cached0 = getCache<MenuPack | null>(`menu:${todayOnDevice()}`);
-  const [loading, setLoading] = useState(cached0 === undefined);
-  const [menu, setMenu] = useState<MenuPack | null>(
-    cached0 === undefined ? null : cached0
-  );
+  const cached = getCache<MenuPack | null>(`menu:${todayOnDevice()}`);
+  const [menu, setMenu] = useState<MenuPack | null>(cached ?? null);
+  const [loading, setLoading] = useState(cached === undefined);
+  const [error, setError] = useState("");
   const [mealFilter, setMealFilter] = useState<MealView>(() =>
-    defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS)
+    defaultMealFromHours(new Date(), DEFAULT_CAFE_HOURS),
   );
   const [shotOpen, setShotOpen] = useState(false);
-  const shotScroll = useRef(0);
-  const shotAnim = useRef<number | null>(null);
-
+  const [selection, setSelection] = useState<{
+    context: string;
+    station: string;
+  } | null>(null);
   useEffect(() => {
+    const controller = new AbortController();
     const key = `menu:${date}`;
     const cached = getCache<MenuPack | null>(key);
-    if (cached !== undefined) {
-      setMenu(cached);
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(withDeviceTz("/api/menu/today", { date }));
-        const data = await res.json();
-        if (cancelled) return;
-        setMenu(data.menu ?? null);
-        setCache(key, data.menu ?? null, 3 * 60_000);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [date]);
-
-  useEffect(() => {
+    setMenu(cached ?? null);
+    setLoading(cached === undefined);
+    setError("");
     setShotOpen(false);
-    if (shotAnim.current) window.cancelAnimationFrame(shotAnim.current);
-  }, [date]);
-
-  useEffect(() => {
-    return () => {
-      if (shotAnim.current) window.cancelAnimationFrame(shotAnim.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!shotOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") closeShot();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shotOpen]);
-
-  function reduceMotion() {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
-
-  function openShot() {
-    if (shotAnim.current) window.cancelAnimationFrame(shotAnim.current);
-    shotScroll.current = window.scrollY;
-    setShotOpen(true);
-  }
-
-  function closeShot() {
-    setShotOpen(false);
-    const from = window.scrollY;
-    const to = shotScroll.current;
-    if (reduceMotion() || Math.abs(from - to) < 1) {
-      window.scrollTo(0, to);
-      return;
-    }
-    const start = performance.now();
-    const step = (now: number) => {
-      const y = scrollAt(from, to, now - start, SHOT_MS);
-      window.scrollTo(0, y);
-      if (now - start < SHOT_MS) {
-        shotAnim.current = window.requestAnimationFrame(step);
-      } else {
-        shotAnim.current = null;
-      }
-    };
-    shotAnim.current = window.requestAnimationFrame(step);
-  }
-
+    requestJson<{ menu: MenuPack | null }>(
+      withDeviceTz("/api/menu/today", { date }),
+      { signal: controller.signal },
+    )
+      .then((data) => {
+        setMenu(data.menu);
+        setCache(key, data.menu, 180_000);
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [date, requestJson, getCache, setCache]);
   const stations = useMemo(() => {
-    if (!menu) return [];
-    const all = menu.menu.meals.flatMap((meal) =>
-      meal.stations.map((st) => ({
-        ...st,
-        meal: meal.type,
-        alwaysOn: st.name === "Salad Compose",
-      }))
-    );
-    if (mealFilter === "salad") {
-      return all.filter((st) => st.alwaysOn);
-    }
-    if (mealFilter === "breakfast") {
-      return all.filter(
-        (st) =>
-          !st.alwaysOn && String(st.meal).toLowerCase() === "breakfast"
-      );
-    }
-    // Lunch specials + always-on salad bar
-    return all.filter(
-      (st) => st.alwaysOn || String(st.meal).toLowerCase() === "lunch"
+    const all =
+      menu?.menu.meals.flatMap((meal) =>
+        meal.stations.map((st) => ({
+          ...st,
+          meal: meal.type,
+          alwaysOn: st.name === "Salad Compose",
+        })),
+      ) || [];
+    return all.filter((st) =>
+      mealFilter === "salad"
+        ? st.alwaysOn
+        : mealFilter === "breakfast"
+          ? !st.alwaysOn && st.meal.toLowerCase() === "breakfast"
+          : st.alwaysOn || st.meal.toLowerCase() === "lunch",
     );
   }, [menu, mealFilter]);
-
+  // Apply the selection only to its own day and meal. If it is unavailable,
+  // show the first station rather than an empty or unrelated dish panel.
+  const context = `${date}:${mealFilter}`;
+  const activeStation =
+    stations.find(
+      (st) =>
+        selection?.context === context &&
+        `${st.meal}:${st.name}` === selection.station,
+    ) || stations[0];
   return (
     <Page>
-      <PageHeader
-        title="Menu"
-        subtitle={menu?.date}
-        action={
-          <DateNav date={date} onChange={setDate} maxDate={todayOnDevice()} />
-        }
-      />
-
+      <h1 className="sr-only">Menu</h1>
+      <div className="menu-toolbar">
+        <div
+          className="flex flex-wrap gap-2"
+          role="radiogroup"
+          aria-label="Meal"
+        >
+          {MEAL_VIEWS.map(({ id, label }) => (
+            <button
+              type="button"
+              className="chip"
+              role="radio"
+              aria-checked={mealFilter === id}
+              data-active={mealFilter === id}
+              key={id}
+              onClick={() => setMealFilter(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <DateNav date={date} onChange={setDate} maxDate={todayOnDevice()} />
+      </div>
+      {menu?.isFallback && (
+        <p className="menu-posted-context">Latest posted · {menu.date}</p>
+      )}
+      {error && <Alert tone="bad">{error}</Alert>}
       {loading && !menu && <PageSkeleton rows={4} />}
-
-      {!loading && !menu && (
+      {!loading && !menu && !error && (
         <EmptyState
           icon={ClipboardList}
-          title="Nothing posted"
-          body="Menus usually land mid-morning."
+          title="Nothing posted yet"
+          body="The café menu will appear here as soon as it’s available."
         />
       )}
-
       {menu && (
-        <div className="animate-in space-y-5">
-          {menu.isFallback && (
-            <p className="text-xs font-semibold text-[var(--muted)]">
-              Latest posted · {menu.date}
+        <div className="animate-in">
+          {activeStation && (
+            <div className="menu-feature">
+              <section
+                id="station-dishes"
+                className="station-panel"
+                aria-label={`${activeStation.name} dishes`}
+              >
+                <div
+                  className="station-content animate-in"
+                  key={`${context}:${activeStation.meal}:${activeStation.name}`}
+                >
+                  {activeStation.alwaysOn && !menu.meta?.previewCatalog ? (
+                    <ul
+                      className="station-ingredients"
+                      aria-label="Available salad ingredients"
+                    >
+                      {activeStation.items.map((item) => (
+                        <li key={item.name}>{item.name}</li>
+                      ))}
+                    </ul>
+                  ) : activeStation.items.length ? (
+                    <ul
+                      className="menu-photo-grid"
+                      aria-label={`${activeStation.name} dishes`}
+                    >
+                      {activeStation.items.map((item, index) => {
+                        const photo = dishPhoto(item.name);
+                        return (
+                          <li key={item.name} data-featured={index === 0}>
+                            <div className="menu-dish-image">
+                              {photo ? (
+                                <Image
+                                  src={photo}
+                                  alt=""
+                                  fill
+                                  sizes={
+                                    index === 0
+                                      ? "(max-width: 767px) 92vw, 850px"
+                                      : "(max-width: 767px) 30vw, 280px"
+                                  }
+                                />
+                              ) : (
+                                <span className="menu-photo-placeholder">
+                                  <Utensils size={28} aria-hidden="true" />
+                                </span>
+                              )}
+                            </div>
+                            <h2>{item.name}</h2>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="section-description">
+                      No dishes posted at this station.
+                    </p>
+                  )}
+                </div>
+              </section>
+              <aside className="station-index">
+                <h2>Stations</h2>
+                <nav aria-label="Café stations">
+                  {stations.map((st) => {
+                    const active = st === activeStation;
+                    return (
+                      <button
+                        type="button"
+                        key={`${st.meal}:${st.name}`}
+                        className="station-filter"
+                        aria-pressed={active}
+                        aria-controls="station-dishes"
+                        data-active={active}
+                        onClick={() =>
+                          setSelection({
+                            context,
+                            station: `${st.meal}:${st.name}`,
+                          })
+                        }
+                      >
+                        <span>{st.name}</span>
+                      </button>
+                    );
+                  })}
+                </nav>
+                {menu.sourceImagePath && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary posted-menu-button"
+                    onClick={() => setShotOpen(true)}
+                  >
+                    View posted menu <ArrowUpRight size={16} />
+                  </button>
+                )}
+              </aside>
+            </div>
+          )}
+          {!stations.length && (
+            <p className="section-description">
+              No stations posted for this meal.
             </p>
-          )}
-
-          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Meal">
-            {MEAL_VIEWS.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                className="chip"
-                role="radio"
-                aria-checked={mealFilter === id}
-                data-active={mealFilter === id}
-                onClick={() => setMealFilter(id)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {menu.sourceImagePath && (
-            <Card className="!overflow-hidden !p-2">
-              <button
-                type="button"
-                className="menu-shot"
-                data-open={shotOpen ? "true" : undefined}
-                aria-expanded={shotOpen}
-                aria-label={
-                  shotOpen
-                    ? "Shrink today’s café menu"
-                    : "Grow today’s café menu"
-                }
-                onClick={() => (shotOpen ? closeShot() : openShot())}
-              >
-                <Image
-                  src={menu.sourceImagePath}
-                  alt="Today’s café menu"
-                  width={1200}
-                  height={1200}
-                  className="menu-shot-img"
-                  unoptimized
-                />
-              </button>
-            </Card>
-          )}
-
-          <div className="card-grid-2">
-            {stations.map((st) => (
-              <Card key={`${st.meal}-${st.name}`}>
-                <p className="text-[0.68rem] font-bold uppercase tracking-[0.08em] text-[var(--muted)]">
-                  {st.alwaysOn ? st.name : `${st.meal} · ${st.name}`}
-                </p>
-                <ul className="mt-2">
-                  {st.items.map((it) => (
-                    <li key={it.name} className="dish-line">
-                      <span>{it.name}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            ))}
-          </div>
-          {stations.length === 0 && (
-            <p className="text-sm text-[var(--muted)]">No stations in this meal.</p>
           )}
         </div>
       )}
+      <EditorDialog
+        open={shotOpen}
+        title="The café’s posted menu"
+        onClose={() => setShotOpen(false)}
+      >
+        {menu?.sourceImagePath && (
+          <Image
+            src={menu.sourceImagePath}
+            alt={`Posted café menu for ${menu.date}`}
+            width={1200}
+            height={1600}
+            className="posted-menu-image"
+            unoptimized
+          />
+        )}
+      </EditorDialog>
     </Page>
   );
 }

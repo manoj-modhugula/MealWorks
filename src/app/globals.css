@@ -579,8 +579,8 @@
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--ink);
-  --font-sans: var(--font-sans);
-  --font-display: var(--font-display);
+  --font-sans: var(--font-geist);
+  --font-display: var(--font-geist);
 }
 
 * {
@@ -836,9 +836,7 @@ h1.display,
 .card {
   position: relative;
   z-index: 1;
-  background: none !important;
-  background-color: transparent !important;
-  background-image: none !important;
+  background: var(--surface);
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   border: 1px solid var(--plane-border);
@@ -878,7 +876,7 @@ h1.display,
 .card li,
 .card label,
 .card .label {
-  text-shadow: var(--card-text-shadow);
+  text-shadow: none;
 }
 
 .card-tint-mint,
@@ -889,8 +887,7 @@ h1.display,
 .card-tint-brand,
 .card-tint-lavender,
 .card-tint-sky {
-  background: none !important;
-  background-color: transparent !important;
+  background: var(--surface);
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
@@ -1839,181 +1836,6 @@ select.field {
   background: var(--ink);
 }
 
-/* Plate ideas cylinder carousel */
-.plate-carousel {
-  width: 100%;
-  margin: 0.25rem 0 0.5rem;
-}
-
-.plate-carousel-stage {
-  --plate-pad: 0.7rem;
-  width: 100%;
-  margin: 0;
-  padding: var(--plate-pad) !important;
-  box-sizing: border-box;
-  touch-action: pan-y;
-  transform: none !important;
-  box-shadow: var(--plate-stage-shadow) !important;
-}
-
-.plate-carousel-stage:hover {
-  transform: none !important;
-  box-shadow: var(--plate-stage-shadow) !important;
-}
-
-.plate-carousel-track {
-  position: relative;
-  width: 100%;
-  height: 8.75rem;
-  overflow: hidden;
-  border-radius: calc(var(--radius) - 4px);
-  perspective: 900px;
-  background: transparent;
-  box-shadow: var(--carousel-well);
-}
-
-.plate-carousel-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: calc(100% - 0.5rem);
-  max-width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius);
-  cursor: pointer;
-  transform-origin: center center;
-  transition:
-    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.35s ease,
-    filter 0.35s ease,
-    z-index 0s;
-  -webkit-tap-highlight-color: transparent;
-}
-
-@media (min-width: 700px) {
-  .plate-carousel-card {
-    width: calc((100% - 1.15rem) / 2);
-  }
-}
-
-.plate-carousel-card-inner {
-  padding: 0.7rem;
-  text-align: left;
-  height: 100%;
-  min-height: 0;
-  box-sizing: border-box;
-  pointer-events: none;
-  border-radius: var(--radius) !important;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--plate-card-shadow) !important;
-}
-
-.plate-carousel-picks {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-evenly;
-  flex: 1;
-  min-height: 0;
-  margin: 0.2rem 0 0;
-  font-size: 0.9375rem;
-  color: var(--ink-soft);
-}
-
-.plate-carousel-card.is-center {
-  z-index: 5;
-  transform: translate(-50%, -50%) scale(1) translateZ(0);
-  opacity: 1;
-  filter: none;
-  cursor: default;
-}
-
-.plate-carousel-card.is-left {
-  z-index: 3;
-  height: calc(100% - 10px);
-  transform: translate(calc(-50% - 58%), -50%) scale(1) translateZ(-24px);
-  opacity: 0.5;
-  filter: none;
-  box-shadow: var(--plate-card-shadow-side);
-}
-
-.plate-carousel-card.is-right {
-  z-index: 3;
-  height: calc(100% - 10px);
-  transform: translate(calc(-50% + 58%), -50%) scale(1) translateZ(-24px);
-  opacity: 0.5;
-  filter: none;
-  box-shadow: var(--plate-card-shadow-side);
-}
-
-.plate-carousel-card.is-hidden {
-  z-index: 1;
-  transform: translate(-50%, -50%) scale(0.96) translateZ(-60px);
-  opacity: 0;
-  filter: blur(4px);
-  pointer-events: none;
-}
-
-.plate-carousel-card.is-center .plate-carousel-card-inner {
-  box-shadow: var(--plate-card-shadow-center) !important;
-}
-
-.plate-carousel-card.is-left .plate-carousel-card-inner,
-.plate-carousel-card.is-right .plate-carousel-card-inner {
-  filter: blur(2.5px);
-  box-shadow:
-    0 1px 0 var(--chrome-border-top) inset,
-    0 -1px 0 var(--plane-border-bottom) inset !important;
-}
-
-.plate-carousel-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  margin-top: 0.65rem;
-}
-
-.plate-carousel-dots {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.plate-carousel-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  border: none;
-  padding: 0;
-  background: var(--carousel-dot);
-  cursor: pointer;
-  transition:
-    transform 0.2s ease,
-    background 0.2s ease;
-}
-
-.plate-carousel-dot[data-active="true"] {
-  background: var(--ink);
-  transform: scale(1.25);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .plate-carousel-card {
-    transition: opacity 0.2s ease;
-  }
-  .plate-carousel-card.is-left,
-  .plate-carousel-card.is-right {
-    filter: none;
-    opacity: 0.4;
-  }
-}
-
 /* Modern fit score */
 .score-arc {
   position: relative;
@@ -2591,233 +2413,11 @@ select.field {
   }
 }
 
-/* Settings page: equal 2×2 cards */
-.settings-grid {
-  align-items: stretch;
-}
-
-/* Grid children must shrink or half-width cards overflow */
-.settings-grid > * {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.settings-card {
-  display: flex !important;
-  flex-direction: column;
-  gap: 0.85rem;
-  height: 100%;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  min-height: 0;
-  box-sizing: border-box;
-}
-
-.settings-card-head {
-  flex-shrink: 0;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.settings-card-desc {
-  margin: 0.35rem 0 0;
-  font-size: 0.875rem;
-  line-height: 1.4;
-  color: var(--muted);
-}
-
-.settings-card-body {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-width: 0;
-  max-width: 100%;
-  min-height: 0;
-}
-
-.settings-card-actions {
-  flex-shrink: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: auto;
-  padding-top: 0.15rem;
-  min-width: 0;
-  max-width: 100%;
-}
-
-/* Theme pill + schedule (Settings Appearance) */
-.theme-seg {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.2rem;
-  padding: 0.25rem;
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg);
-  border: 1px solid var(--chrome-border);
-  border-top-color: var(--chrome-border-top);
-  border-bottom-color: var(--plane-border-bottom);
-  box-shadow: var(--elevate-1);
-  -webkit-backdrop-filter: blur(16px) saturate(var(--glass-saturate));
-  backdrop-filter: blur(16px) saturate(var(--glass-saturate));
-  width: fit-content;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.theme-seg-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 650;
-  padding: 0.48rem 0.75rem;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-  transition:
-    background 0.14s ease,
-    color 0.14s ease,
-    box-shadow 0.14s ease;
-}
-
-.theme-seg-btn:hover {
-  color: var(--ink);
-}
-
-.theme-seg-btn[data-active="true"] {
-  background: var(--primary-bg);
-  color: var(--primary-ink);
-  box-shadow: var(--primary-chip-shadow);
-}
-
-.theme-seg-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.theme-schedule {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  margin-top: 0.15rem;
-  flex: 1 1 auto;
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/*
-  Native date/time inputs have large intrinsic min-width and spill into
-  neighbor columns (covers gap → fields look glued, middle looks sharp).
-  Wrap them in .field-shell; use .field-native on the input.
-*/
-.field-shell,
-.theme-time-shell {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  overflow: hidden;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--field-shadow);
-}
-
-.field-native.field,
-.theme-time-field.field {
-  display: block;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  box-sizing: border-box;
-  box-shadow: none !important;
-  border-radius: var(--radius-sm);
-}
-
-.field-shell:hover .field-native.field,
-.theme-time-shell:hover .theme-time-field.field,
-.theme-time-shell:hover .field-native.field,
-.field-shell:hover .theme-time-field.field {
-  background: var(--field-bg-hover) !important;
-}
-
-.field-shell:focus-within,
-.theme-time-shell:focus-within {
-  box-shadow: var(--field-shadow-focus);
-}
-
-.field-shell:focus-within .field-native.field,
-.field-shell:focus-within .theme-time-field.field,
-.theme-time-shell:focus-within .theme-time-field.field,
-.theme-time-shell:focus-within .field-native.field {
-  border-color: var(--accent);
-}
-
-.field-native.field::-webkit-datetime-edit,
-.field-native.field::-webkit-datetime-edit-fields-wrapper,
-.field-native.field::-webkit-datetime-edit-text,
-.field-native.field::-webkit-datetime-edit-hour-field,
-.field-native.field::-webkit-datetime-edit-minute-field,
-.field-native.field::-webkit-datetime-edit-ampm-field,
-.field-native.field::-webkit-datetime-edit-year-field,
-.field-native.field::-webkit-datetime-edit-month-field,
-.field-native.field::-webkit-datetime-edit-day-field,
-.theme-time-field.field::-webkit-datetime-edit,
-.theme-time-field.field::-webkit-datetime-edit-fields-wrapper,
-.theme-time-field.field::-webkit-datetime-edit-text,
-.theme-time-field.field::-webkit-datetime-edit-hour-field,
-.theme-time-field.field::-webkit-datetime-edit-minute-field,
-.theme-time-field.field::-webkit-datetime-edit-ampm-field {
-  min-width: 0;
-  max-width: 100%;
-  padding: 0;
-}
-
-.field-native.field::-webkit-calendar-picker-indicator,
-.theme-time-field.field::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  flex-shrink: 0;
-  margin-inline-start: 0.15rem;
-}
-
-/* Side-by-side form rows: always allow columns to shrink */
-.field-row-2 {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.75rem;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-@media (min-width: 640px) {
-  .field-row-2 {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-}
-
-.field-row-2 > * {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.theme-schedule-status {
-  margin: 0.35rem 0 0;
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  color: var(--muted);
-  min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
+/* Shared bounded form columns. */
+.field-row-2 {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0;}
+.field-row-2 > * {min-width:0;}
+.field-shell {display:block;width:100%;max-width:100%;min-width:0;}
+.field-native {width:100%;min-width:0;max-width:100%;}
 
 /* Motion */
 @media (prefers-reduced-motion: no-preference) {
@@ -3730,37 +3330,6 @@ select.field {
   cursor: not-allowed;
   transform: none;
   box-shadow: var(--elevate-1);
-}
-.menu-shot {
-  display: block;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  border-radius: 12px;
-  overflow: hidden;
-  cursor: zoom-in;
-}
-.menu-shot[data-open="true"] {
-  cursor: zoom-out;
-}
-.menu-shot-img {
-  display: block;
-  margin: 0 auto;
-  width: 100%;
-  height: auto;
-  max-height: 320px;
-  object-fit: contain;
-  transition: max-height 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.menu-shot[data-open="true"] .menu-shot-img {
-  max-height: min(90vh, 1400px);
-}
-@media (prefers-reduced-motion: reduce) {
-  .menu-shot-img {
-    transition: none;
-  }
 }
 .dish-flip:not([data-open="true"]) {
   cursor: pointer;

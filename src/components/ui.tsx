@@ -13,7 +13,13 @@ export function Page({
   className?: string;
 }) {
   return (
-    <main className={cn("page-content", className)}>{children}</main>
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className={cn("page-content", className)}
+    >
+      {children}
+    </main>
   );
 }
 
@@ -29,7 +35,7 @@ export function PageHeader({
   icon?: LucideIcon;
 }) {
   return (
-    <div className="mb-6 flex items-start justify-between gap-3">
+    <div className="page-header">
       <div className="min-w-0">
         <div className="flex items-center gap-2.5">
           {Icon && (
@@ -37,9 +43,7 @@ export function PageHeader({
               <Icon size={18} strokeWidth={2} aria-hidden />
             </span>
           )}
-          <h1 className="page-title text-[1.65rem] text-[var(--ink)] sm:text-[1.85rem]">
-            {title}
-          </h1>
+          <h1 className="page-title">{title}</h1>
         </div>
         {subtitle && (
           <p className="mt-1.5 text-[0.95rem] leading-snug text-[var(--muted)]">
@@ -47,9 +51,7 @@ export function PageHeader({
           </p>
         )}
       </div>
-      {action && (
-        <div className="flex shrink-0 items-center gap-1.5">{action}</div>
-      )}
+      {action && <div className="page-header-actions">{action}</div>}
     </div>
   );
 }
@@ -73,8 +75,8 @@ export const Card = ({
     | "butter"
     | "sky";
 } & React.HTMLAttributes<HTMLDivElement> & {
-  ref?: React.Ref<HTMLDivElement>;
-}) => {
+    ref?: React.Ref<HTMLDivElement>;
+  }) => {
   const tintClass =
     tint === "warm"
       ? "card-tint-warm"
@@ -177,7 +179,7 @@ export function ChipGroup({
                 onChange(
                   active
                     ? selected.filter((s) => s !== opt.value)
-                    : [...selected, opt.value]
+                    : [...selected, opt.value],
                 );
               } else {
                 onChange([opt.value]);
@@ -206,9 +208,7 @@ export function ChoicePicks({
   customPlaceholder?: string;
 }) {
   const [draft, setDraft] = useState("");
-  const extras = selected.filter(
-    (s) => !options.some((o) => o.value === s)
-  );
+  const extras = selected.filter((s) => !options.some((o) => o.value === s));
   const merged = [
     ...options,
     ...extras.map((v) => ({
@@ -228,19 +228,29 @@ export function ChoicePicks({
     <div className="space-y-3">
       <ChipGroup options={merged} selected={selected} onChange={onChange} />
       {allowCustom && (
-        <input
-          className="field"
-          value={draft}
-          placeholder={customPlaceholder}
-          aria-label={customPlaceholder}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === ",") {
-              e.preventDefault();
-              addCustom();
-            }
-          }}
-        />
+        <div className="custom-choice">
+          <input
+            className="field"
+            value={draft}
+            placeholder={customPlaceholder}
+            aria-label={customPlaceholder}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                addCustom();
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={!draft.trim()}
+            onClick={addCustom}
+          >
+            Add
+          </button>
+        </div>
       )}
     </div>
   );
@@ -276,7 +286,7 @@ export function BookLoader({
       className={cn(
         "book-loader",
         compact ? "book-loader-compact" : undefined,
-        flipping ? "is-flipping" : "is-still"
+        flipping ? "is-flipping" : "is-still",
       )}
       role="status"
       aria-live="polite"
@@ -303,16 +313,12 @@ export function Spinner({ label = "Loading…" }: { label?: string }) {
 }
 
 /** Pulse block placeholder. */
-export function Skeleton({
-  className,
-}: {
-  className?: string;
-}) {
+export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
         "animate-pulse rounded-[10px] bg-[var(--skeleton-fill)]",
-        className
+        className,
       )}
       aria-hidden
     />
@@ -399,7 +405,7 @@ export function ScoreRing({
     pct >= 70 ? "good" : pct >= 40 ? "mid" : pct > 0 ? "low" : "empty";
   const stroke =
     band === "good"
-      ? "var(--accent)"
+      ? "var(--good)"
       : band === "mid"
         ? "var(--caution)"
         : band === "low"
@@ -413,7 +419,13 @@ export function ScoreRing({
     >
       <svg className="score-arc-svg" viewBox="0 0 100 100" aria-hidden>
         <defs>
-          <linearGradient id={`score-grad-${uid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient
+            id={`score-grad-${uid}`}
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="100%"
+          >
             <stop offset="0%" stopColor={stroke} stopOpacity="1" />
             <stop offset="100%" stopColor={stroke} stopOpacity="0.65" />
           </linearGradient>

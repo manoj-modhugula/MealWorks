@@ -1,4 +1,5 @@
 import fs from "fs";
+import { scoreFromItems } from "./fit-score";
 import path from "path";
 import {
   extractJson,
@@ -46,22 +47,6 @@ function decisionOf(v: unknown): ItemDecision {
   if (s === "avoid" || s === "skip" || s === "no" || s === "bad") return "avoid";
   if (s === "caution" || s === "maybe" || s === "ok") return "caution";
   return "caution";
-}
-
-function scoreFromItems(items: { decision: ItemDecision }[]) {
-  const total = items.length || 1;
-  const rec = items.filter((i) => i.decision === "recommended").length;
-  const avoid = items.filter((i) => i.decision === "avoid").length;
-  const ratio = rec / total;
-  const avoidRatio = avoid / total;
-  let score = Math.round(ratio * 100 - avoidRatio * 10);
-  score = Math.max(0, Math.min(100, score));
-  let verdict: MatchPayload["verdict"] = "mostly_fine";
-  if (ratio >= 0.4) verdict = "great";
-  else if (ratio >= 0.2) verdict = "mostly_fine";
-  else if (ratio >= 0.08) verdict = "thin_options";
-  else verdict = "not_your_day";
-  return { score, verdict, rec };
 }
 
 /** Fallback 3-slot combos if baseline combos missing (mirrors matching.ts). */
@@ -148,19 +133,6 @@ export function fileToDataUrl(filePath: string) {
               ? "image/heic"
               : "image/jpeg";
   return `data:${mime};base64,${buf.toString("base64")}`;
-}
-
-function compactMenu(menu: StructuredMenu) {
-  return {
-    date: menu.date,
-    meals: menu.meals.map((m) => ({
-      type: m.type,
-      stations: m.stations.map((s) => ({
-        name: s.name,
-        items: s.items.map((i) => ({ name: i.name, tags: i.tags || [] })),
-      })),
-    })),
-  };
 }
 
 /** Compact list for AI polish (names + baseline decision only). */
@@ -368,14 +340,14 @@ export async function matchMenuToPrefs(options: {
     aiStatus?: MatchPayload["aiStatus"]
   ): MatchPayload & { mode: AiMode; source: MatchSource } => {
     const items = payload.items;
-    const { score, verdict, rec } = scoreFromItems(items);
+    const { score, verdict, recommended: rec } = scoreFromItems(items);
     // Always 3 slots (Breakfast · Lunch · Salad) from local plate builder
     const combos =
       baseline.combos?.length === 3
         ? baseline.combos
         : buildCombos(items);
     return {
-      verdict: payload.verdict || verdict,
+      verdict,
       headline: payload.headline || baseline.headline,
       summary:
         payload.summary ||
@@ -506,7 +478,7 @@ RULES:
     if (aiCombos.length) combos = aiCombos;
     if (!combos.length) combos = buildCombos(items);
 
-    const { score, verdict, rec } = scoreFromItems(items);
+    const { score, verdict, recommended: rec } = scoreFromItems(items);
     const validVerdicts = new Set([
       "great",
       "mostly_fine",

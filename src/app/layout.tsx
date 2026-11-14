@@ -1,20 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import { Geist } from "next/font/google";
 import Script from "next/script";
 import { Providers } from "@/components/providers";
 import "./globals.css";
+import "./workspace.css";
 
-const fraunces = Fraunces({
-  variable: "--font-display",
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
-  display: "swap",
-});
-
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
   display: "swap",
 });
 
@@ -25,8 +18,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#eef1f6" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0d12" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f8fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#101215" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -44,7 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning data-theme="light">
-      <body className={`${fraunces.variable} ${jakarta.variable} antialiased`}>
+      <body className={`${geist.variable} antialiased`}>
         <Script
           id="mealworks-theme-init"
           strategy="beforeInteractive"
