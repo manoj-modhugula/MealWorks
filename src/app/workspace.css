@@ -1373,16 +1373,17 @@ span.chip.note-dish-chip {
   column-gap: 18px;
 }
 .dish-tile {
-  --dish-ratio: 1;
+  --dish-ratio: 1.5;
   position: relative;
   display: inline-flex;
   vertical-align: top;
   align-items: flex-end;
   width: 100%;
   aspect-ratio: var(--dish-ratio);
-  min-height: 248px;
+  min-height: 220px;
+  max-height: 350px;
   margin: 0 0 18px;
-  padding: clamp(20px, 2vw, 28px);
+  padding: clamp(20px, 1.8vw, 24px);
   break-inside: avoid;
   isolation: isolate;
   overflow: hidden;
@@ -1395,28 +1396,28 @@ span.chip.note-dish-chip {
   -webkit-tap-highlight-color: transparent;
 }
 .dish-tile:nth-child(8n + 1) {
-  --dish-ratio: 1.16;
+  --dish-ratio: 1.5;
 }
 .dish-tile:nth-child(8n + 2) {
-  --dish-ratio: 1.1;
+  --dish-ratio: 1.6;
 }
 .dish-tile:nth-child(8n + 3) {
-  --dish-ratio: 1.2;
+  --dish-ratio: 1.55;
 }
 .dish-tile:nth-child(8n + 4) {
-  --dish-ratio: 0.78;
+  --dish-ratio: 1.16;
 }
 .dish-tile:nth-child(8n + 5) {
-  --dish-ratio: 1.05;
+  --dish-ratio: 1.15;
 }
 .dish-tile:nth-child(8n + 6) {
-  --dish-ratio: 0.92;
+  --dish-ratio: 1.5;
 }
 .dish-tile:nth-child(8n + 7) {
-  --dish-ratio: 1.08;
+  --dish-ratio: 1.55;
 }
 .dish-tile:nth-child(8n) {
-  --dish-ratio: 0.62;
+  --dish-ratio: 1.6;
 }
 .dish-tile-photo {
   position: absolute;
@@ -1444,7 +1445,7 @@ span.chip.note-dish-chip {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 9px;
+  gap: 7px;
   min-width: 0;
 }
 .dish-tile-station {
@@ -1457,7 +1458,7 @@ span.chip.note-dish-chip {
 }
 .dish-tile-name {
   max-width: 25ch;
-  font-size: clamp(21px, 2vw, 27px);
+  font-size: clamp(20px, 1.7vw, 22px);
   font-weight: 500;
   line-height: 1.18;
   letter-spacing: -0.035em;
@@ -1487,11 +1488,12 @@ span.chip.note-dish-chip {
   columns: 2;
 }
 .dish-browser[data-open="true"] .dish-tile {
-  min-height: 260px;
+  min-height: 220px;
+  max-height: 300px;
   padding: 20px;
 }
 .dish-browser[data-open="true"] .dish-tile-name {
-  font-size: 21px;
+  font-size: 20px;
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .dish-tile:hover .dish-tile-photo img {
@@ -1511,15 +1513,16 @@ span.chip.note-dish-chip {
     columns: 1;
   }
   .dish-tile {
-    min-height: 260px;
-    aspect-ratio: 1.18;
-    padding: 24px;
+    min-height: 220px;
+    max-height: 300px;
+    aspect-ratio: 1.45;
+    padding: 20px;
   }
   .dish-tile:nth-child(3n + 2) {
-    aspect-ratio: 0.95;
+    aspect-ratio: 1.25;
   }
   .dish-tile-name {
-    font-size: 25px;
+    font-size: 22px;
   }
   .dish-browser[data-open="true"] .dish-gallery {
     display: none;
