@@ -13,6 +13,9 @@ export default async function AppLayout({
   return (
     <div className="app-shell">
       <div className="app-frame">
+        <a className="skip-link" href="#main-content">
+          Skip to content
+        </a>
         <AppNav />
         {children}
       </div>

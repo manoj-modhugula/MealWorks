@@ -15,7 +15,7 @@ function LoginForm() {
   const [error, setError] = useState(
     searchParams.get("error") === "session"
       ? "Session ended. Sign in again."
-      : ""
+      : "",
   );
   const [loading, setLoading] = useState(false);
 
@@ -33,11 +33,14 @@ function LoginForm() {
       const res = await signIn("credentials", {
         email: cleanEmail,
         password,
-        callbackUrl: "/continue",
+        redirect: false,
+        redirectTo: "/continue",
       });
       if (res?.error) {
         setLoading(false);
         setError("Wrong email or password.");
+      } else {
+        window.location.assign(res.url || "/continue");
       }
     } catch {
       setLoading(false);
@@ -81,7 +84,11 @@ function LoginForm() {
           />
         </div>
         {error && <Alert tone="bad">{error}</Alert>}
-        <button className="btn btn-primary w-full" disabled={loading} type="submit">
+        <button
+          className="btn btn-primary w-full"
+          disabled={loading}
+          type="submit"
+        >
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
@@ -118,7 +125,9 @@ export default function LoginPage() {
           <span className="brand-wordmark">MealWorks</span>
         </Link>
       </div>
-      <Suspense fallback={<Card className="mx-auto w-full max-w-md">Loading…</Card>}>
+      <Suspense
+        fallback={<Card className="mx-auto w-full max-w-md">Loading…</Card>}
+      >
         <LoginForm />
       </Suspense>
     </Page>

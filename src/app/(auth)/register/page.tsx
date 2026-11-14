@@ -52,11 +52,14 @@ export default function RegisterPage() {
     const login = await signIn("credentials", {
       email: email.trim().toLowerCase(),
       password,
-      callbackUrl: "/continue",
+      redirect: false,
+      redirectTo: "/continue",
     });
     if (login?.error) {
       setLoading(false);
       setError("Account ready. Sign in to continue.");
+    } else {
+      window.location.assign(login.url || "/continue");
     }
   }
 
@@ -136,7 +139,11 @@ export default function RegisterPage() {
               />
             </div>
             {error && <Alert tone="bad">{error}</Alert>}
-            <button className="btn btn-primary w-full" disabled={loading} type="submit">
+            <button
+              className="btn btn-primary w-full"
+              disabled={loading}
+              type="submit"
+            >
               {loading ? "Creating…" : "Sign up"}
             </button>
           </form>
@@ -153,12 +160,18 @@ export default function RegisterPage() {
                 autoComplete="one-time-code"
                 maxLength={6}
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onChange={(e) =>
+                  setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                }
                 required
               />
             </div>
             {error && <Alert tone="bad">{error}</Alert>}
-            <button className="btn btn-primary w-full" disabled={loading} type="submit">
+            <button
+              className="btn btn-primary w-full"
+              disabled={loading}
+              type="submit"
+            >
               {loading ? "Checking…" : "Verify"}
             </button>
             <p className="text-center text-sm text-[var(--muted)]">

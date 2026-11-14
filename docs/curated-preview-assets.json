@@ -1,0 +1,74 @@
+{
+  "tool": "Built-in image_gen",
+  "prompt": "Premium cafe menu dish photograph. Landscape 3:2 close-up at 40-degree overhead angle; complete centered serving with room for square thumbnail and wide hero crops. Soft natural window light from left, warm neutral stone tabletop, natural linen, off-white ceramic. Real texture, believable portions, refined editorial food photography. No text, people, watermarks, UI or unrelated food.",
+  "assets": [
+    {
+      "path": "public/images/yogurt.webp",
+      "subject": "Greek yogurt topped with fresh strawberries, blueberries and a little toasted oat granola in a pale ceramic bowl."
+    },
+    {
+      "path": "public/images/oatmeal.webp",
+      "subject": "Creamy oatmeal bowl with sliced banana, cinnamon, toasted walnuts and a few blueberries."
+    },
+    {
+      "path": "public/images/pancakes.webp",
+      "subject": "Three fluffy buttermilk pancakes with a small pat of butter, a little maple syrup and fresh berries."
+    },
+    {
+      "path": "public/images/croissant.webp",
+      "subject": "One golden flaky butter croissant on a small pale stoneware plate, delicate pastry layers."
+    },
+    {
+      "path": "public/images/waffles.webp",
+      "subject": "One golden Belgian waffle with sliced strawberries and a small jug of maple syrup beside the plate."
+    },
+    {
+      "path": "public/images/pizza.webp",
+      "subject": "Small rustic eggplant parmesan pizza with roasted eggplant slices, tomato sauce, melted mozzarella, fresh basil and a charred crust."
+    },
+    {
+      "path": "public/images/pasta.webp",
+      "subject": "Creamy mushroom tagliatelle with sauteed brown mushrooms, parsley and parmesan curls in a wide shallow bowl."
+    },
+    {
+      "path": "public/images/greek-salad.webp",
+      "subject": "Greek salad with chunky cucumber, tomatoes, red onion, black kalamata olives and thick white feta cubes, oregano, no lettuce."
+    },
+    {
+      "path": "public/images/beet-salad.webp",
+      "subject": "Roasted beet and orange salad with ruby beet wedges, orange segments, arugula, walnuts and crumbled goat cheese."
+    },
+    {
+      "path": "public/images/caesar-salad.webp",
+      "subject": "Classic Caesar salad of crisp romaine leaves, golden croutons, shaved parmesan and creamy Caesar dressing, no meat."
+    },
+    {
+      "path": "public/images/potato-salad.webp",
+      "subject": "Creamy potato salad with chunks of tender potatoes, celery, fresh dill and a light mayonnaise dressing in a ceramic bowl."
+    },
+    {
+      "path": "public/images/pasta-salad.webp",
+      "subject": "Italian pasta salad with colorful fusilli, cherry tomatoes, black olives, red peppers, tiny mozzarella balls and fresh basil."
+    },
+    {
+      "path": "public/images/herb-salmon.webp",
+      "subject": "A single fillet of herb-roasted salmon with golden edges, fresh dill, a lemon wedge and a few green asparagus spears on pale ceramic."
+    },
+    {
+      "path": "public/images/roasted-carrots.webp",
+      "subject": "A generous serving of whole slender roasted carrots, caramelized edges, a light maple glaze, fresh thyme and toasted pumpkin seeds on a pale ceramic plate."
+    },
+    {
+      "path": "public/images/lentil-bowl.webp",
+      "subject": "A Mediterranean bowl of brown lentils, diced cucumber, cherry tomatoes, roasted red pepper and fresh parsley, with a little crumbled feta and a lemon wedge."
+    },
+    {
+      "path": "public/images/caprese.webp",
+      "subject": "A caprese salad with alternating slices of ripe red and yellow heirloom tomatoes and fresh white mozzarella, whole basil leaves and extra virgin olive oil on pale ceramic."
+    },
+    {
+      "path": "public/images/stuffed-peppers.webp",
+      "subject": "Two baked red bell pepper halves generously stuffed with quinoa, black beans, sweetcorn and diced tomato, topped with chopped herbs, on a pale ceramic plate."
+    }
+  ]
+}

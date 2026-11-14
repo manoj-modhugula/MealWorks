@@ -33,6 +33,10 @@ Sign in as admin to open the **Admin** suite. Override credentials with `ADMIN_E
 
 **Important:** These defaults are for local development only. Change them before any shared or production deployment.
 
+### Guest demo
+
+Visitors can explore `/demo/today`, `/demo/menu`, `/demo/preferences` and `/demo/settings` without signing in. Sample preferences and reviews stay within the demo and reset on reload. Create account opens the existing registration and onboarding flow. See [Public demo](docs/public-demo.md) for isolation and fit-scoring details.
+
 ### Employee path
 
 1. Register an employee account  

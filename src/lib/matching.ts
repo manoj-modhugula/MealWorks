@@ -11,6 +11,7 @@ import type {
   TempRestrictionInput,
   Verdict,
 } from "./types";
+import { scoreFromItems } from "./fit-score";
 import { uniqueStrings } from "./utils";
 
 const DIET_MEAT_TAGS = [
@@ -309,28 +310,6 @@ function dietBlocks(diet: string, tags: string[]): string | null {
   return null;
 }
 
-function scoreFromItems(items: { decision: ItemDecision }[]): {
-  score: number;
-  verdict: Verdict;
-  recommended: number;
-} {
-  const total = items.length || 1;
-  const recommended = items.filter((i) => i.decision === "recommended").length;
-  const avoid = items.filter((i) => i.decision === "avoid").length;
-  // Personalized fit: weight safe options, penalize avoids
-  const ratio = recommended / total;
-  const avoidRatio = avoid / total;
-  let score = Math.round(ratio * 100 - avoidRatio * 15);
-  score = Math.max(0, Math.min(100, score));
-
-  let verdict: Verdict;
-  if (ratio >= 0.45 && avoidRatio < 0.55) verdict = "great";
-  else if (ratio >= 0.25) verdict = "mostly_fine";
-  else if (ratio >= 0.1) verdict = "thin_options";
-  else verdict = "not_your_day";
-
-  return { score, verdict, recommended };
-}
 
 const HEADLINES: Record<Verdict, string> = {
   great: "Great day for you at the café",
