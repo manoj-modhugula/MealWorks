@@ -213,8 +213,24 @@ export function createDemoWorkspace() {
         digest: {
           createdAt: `${date}T07:00:00`,
           payload: {
-            headline: "A few good things for your day",
-            summary: match.summary,
+            headline:
+              match.verdict === "great"
+                ? "A good day for your plate"
+                : match.headline,
+            summary: match.combos.some((combo) => combo.items.length)
+              ? "A few ideas from the dishes that match your food preferences."
+              : "No dishes match your current preferences. Review your kitchen notes to explore other choices.",
+            plates: match.combos.flatMap((combo) => {
+              const meal =
+                combo.title === "Breakfast idea"
+                  ? "breakfast"
+                  : combo.title === "Lunch idea"
+                    ? "lunch"
+                    : null;
+              return meal && combo.items.length
+                ? [{ meal, items: combo.items.slice(0, 1) }]
+                : [];
+            }),
           },
         },
       });

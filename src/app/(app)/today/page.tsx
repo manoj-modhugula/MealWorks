@@ -3,7 +3,7 @@ import { useExperience } from "@/components/experience-provider";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RotateCw, Utensils } from "lucide-react";
+import { Utensils } from "lucide-react";
 import {
   Alert,
   Card,
@@ -12,6 +12,7 @@ import {
   PageSkeleton,
   ScoreRing,
 } from "@/components/ui";
+import { formatMonthDay } from "@/lib/dates";
 import { DateNav } from "@/components/date-nav";
 import { WeekStrip } from "@/components/week-strip";
 import { WeekStripSlot } from "@/components/week-strip-slot";
@@ -100,7 +101,6 @@ export default function TodayPage() {
   const cached0 = getCache<TodayCache>(`today:${todayOnDevice()}`);
   const [loading, setLoading] = useState(!cached0?.match && !cached0?.menu);
   const [polishing, setPolishing] = useState(false);
-  const [bookBusy, setBookBusy] = useState(false);
   const [error, setError] = useState("");
   const [menu, setMenu] = useState<{
     id?: string;
@@ -179,7 +179,6 @@ export default function TodayPage() {
       const cacheKey = `today:${d}`;
       const cached = !rematch ? getCache<TodayCache>(cacheKey) : undefined;
 
-      if (rematch) setBookBusy(true);
 
       if (cached) {
         setMenu(cached.menu);
@@ -282,7 +281,6 @@ export default function TodayPage() {
       } finally {
         setLoading(false);
         setPolishing(false);
-        setBookBusy(false);
       }
     },
     [applyPayload, date, fetch, getCache, setCache],
@@ -362,24 +360,21 @@ export default function TodayPage() {
 
   const dateControls = (
     <div className="today-date-controls">
-      <DateNav
-        date={date}
-        onChange={setDate}
-        maxDate={todayOnDevice()}
-        onHold={() => setWeekOpen((v) => !v)}
-      />
-      <button
-        type="button"
-        className="icon-btn book-refresh-btn"
-        aria-label={bookBusy ? "Refreshing match" : "Refresh match"}
-        disabled={bookBusy}
-        onClick={() => load({ rematch: true })}
-      >
-        <RotateCw
-          size={18}
-          className={bookBusy ? "refresh-spinning" : undefined}
+      {isDemo ? (
+        <p className="menu-sample-context">
+          Sample menu ·{" "}
+          <time dateTime={menu?.date || date}>
+            {formatMonthDay(menu?.date || date)}
+          </time>
+        </p>
+      ) : (
+        <DateNav
+          date={date}
+          onChange={setDate}
+          maxDate={todayOnDevice()}
+          onHold={() => setWeekOpen((v) => !v)}
         />
-      </button>
+      )}
     </div>
   );
 
@@ -436,11 +431,6 @@ export default function TodayPage() {
                     <div className="today-fit-counts">
                       <p>{dayRec} good</p>
                       <p>{daySkip} skip</p>
-                      <span className="fit-score-explanation">
-                        {match.score >= 97
-                          ? "Enough choices at every meal"
-                          : "Variety across your meals"}
-                      </span>
                     </div>
                   </div>
                   {polishing && (
@@ -449,11 +439,6 @@ export default function TodayPage() {
                       role="status"
                     >
                       Updating…
-                    </p>
-                  )}
-                  {!menu.isFallback && (
-                    <p className="today-summary-footnote">
-                      Choose a dish below for ratings, notes and your review.
                     </p>
                   )}
                   {menu.isFallback && (

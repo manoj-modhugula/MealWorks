@@ -7,6 +7,7 @@ import { Alert, EmptyState, Page, PageSkeleton } from "@/components/ui";
 import { EditorDialog } from "@/components/editor-dialog";
 import { DateNav } from "@/components/date-nav";
 import { todayOnDevice, withDeviceTz } from "@/lib/client-date";
+import { formatMonthDay } from "@/lib/dates";
 import { dishPhoto } from "@/lib/sample-catalog";
 import {
   DEFAULT_CAFE_HOURS,
@@ -65,7 +66,7 @@ function MenuDishPhoto({
 }
 
 export default function MenuPage() {
-  const { requestJson, getCache, setCache } = useExperience();
+  const { isDemo, requestJson, getCache, setCache } = useExperience();
   const [date, setDate] = useState(() => todayOnDevice());
   const cached = getCache<MenuPack | null>(`menu:${todayOnDevice()}`);
   const [menu, setMenu] = useState<MenuPack | null>(cached ?? null);
@@ -133,11 +134,7 @@ export default function MenuPage() {
     <Page>
       <h1 className="sr-only">Menu</h1>
       <div className="menu-toolbar">
-        <div
-          className="flex flex-wrap gap-2"
-          role="radiogroup"
-          aria-label="Meal"
-        >
+        <div className="menu-meal-filters" role="radiogroup" aria-label="Meal">
           {MEAL_VIEWS.map(({ id, label }) => (
             <button
               type="button"
@@ -152,9 +149,18 @@ export default function MenuPage() {
             </button>
           ))}
         </div>
-        <DateNav date={date} onChange={setDate} maxDate={todayOnDevice()} />
+        {isDemo ? (
+          <p className="menu-sample-context">
+            Sample menu ·{" "}
+            <time dateTime={menu?.date || date}>
+              {formatMonthDay(menu?.date || date)}
+            </time>
+          </p>
+        ) : (
+          <DateNav date={date} onChange={setDate} maxDate={todayOnDevice()} />
+        )}
       </div>
-      {menu?.isFallback && (
+      {!isDemo && menu?.isFallback && (
         <p className="menu-posted-context">Latest posted · {menu.date}</p>
       )}
       {error && <Alert tone="bad">{error}</Alert>}
