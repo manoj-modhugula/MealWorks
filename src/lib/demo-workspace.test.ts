@@ -134,7 +134,9 @@ describe("public sample workspace", () => {
     );
     const after = await demo.requestJson<Board>(matchUrl);
     expect(after.match.score).toBe(0);
-    expect(after.match.payload.combos.flatMap((combo) => combo.items)).toEqual([]);
+    expect(after.match.payload.combos.flatMap((combo) => combo.items)).toEqual(
+      [],
+    );
   });
   it("isolates preferences and caches between visitors and from the signed-in app", async () => {
     const first = createDemoWorkspace(),
@@ -182,6 +184,41 @@ describe("public sample workspace", () => {
         )
       ).feedback,
     ).toEqual({});
+  });
+  it("builds digest preview plates from the current food preferences", async () => {
+    const demo = createDemoWorkspace();
+    type Preview = {
+      digest: { payload: { plates: { meal: string; items: string[] }[] } };
+    };
+    await demo.requestJson("/api/preferences", put({ likes: ["salmon"] }));
+    const first = await demo.requestJson<Preview>("/api/digests/latest");
+    expect(
+      first.digest.payload.plates.find((plate) => plate.meal === "lunch")
+        ?.items,
+    ).toContain("Herb-Roasted Salmon");
+    expect(first.digest.payload.plates.map((plate) => plate.meal)).toEqual([
+      "breakfast",
+      "lunch",
+    ]);
+    expect(
+      first.digest.payload.plates.every((plate) => plate.items.length === 1),
+    ).toBe(true);
+    await demo.requestJson("/api/preferences", put({ dietType: "vegan" }));
+    const next = await demo.requestJson<Preview>("/api/digests/latest");
+    expect(
+      next.digest.payload.plates.flatMap((plate) => plate.items),
+    ).not.toContain("Herb-Roasted Salmon");
+    const board = await demo.requestJson<Board>(matchUrl);
+    const eligible = new Set(
+      board.match.payload.items
+        .filter((item) => item.decision === "recommended")
+        .map((item) => item.name),
+    );
+    expect(
+      next.digest.payload.plates.every((plate) =>
+        plate.items.every((name) => eligible.has(name)),
+      ),
+    ).toBe(true);
   });
   it("never calls the network, including email, account writes and unknown routes", async () => {
     const network = vi.fn(() => {

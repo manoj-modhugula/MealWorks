@@ -142,7 +142,9 @@ export function DishInspectorList({
               <span className="dish-tile-copy">
                 <span className="dish-tile-station">{dish.station}</span>
                 <span className="dish-tile-name">{dish.name}</span>
-                <CommunityRating review={reviews[dish.name]} compact />
+                {reviews[dish.name]?.count > 0 && (
+                  <CommunityRating review={reviews[dish.name]} compact />
+                )}
               </span>
             </button>
           );

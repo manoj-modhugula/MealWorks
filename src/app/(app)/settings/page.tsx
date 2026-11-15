@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { WorkspaceRail } from "@/components/workspace-rail";
 import { EditorDialog } from "@/components/editor-dialog";
 import { signOut } from "next-auth/react";
-import { Clock, Monitor, Moon, Sun, LogOut, Trash2, Globe } from "lucide-react";
+import { LogOut, Trash2, Globe } from "lucide-react";
 import { Alert, Page, PageSkeleton } from "@/components/ui";
-import { useTheme, type ThemePreference } from "@/components/theme-provider";
+import { SettingsAppearance } from "@/components/settings-appearance";
 import { deviceTimeZone } from "@/lib/client-date";
 import { SYSTEM_TZ, systemTzLabel, timezoneGroups } from "@/lib/timezones";
 
@@ -22,22 +22,9 @@ type SettingsCache = {
   } | null;
 };
 
-const THEME_OPTIONS: {
-  value: ThemePreference;
-  label: string;
-  Icon: typeof Sun;
-}[] = [
-  { value: "system", label: "System", Icon: Monitor },
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
-  { value: "schedule", label: "Auto", Icon: Clock },
-];
-
 export default function SettingsPage() {
   const { fetch, requestJson, getCache, setCache, invalidateCache, isDemo } =
     useExperience();
-  const { preference, setPreference, schedule, setSchedule, scheduleStatus } =
-    useTheme();
   const deliveryEdited = useRef(false);
   const cached0 = getCache<SettingsCache>("settings");
   const [loading, setLoading] = useState(!cached0);
@@ -312,117 +299,9 @@ export default function SettingsPage() {
         />
         <div className="profile-main">
           <div className="settings-main">
-            <section
-              id="appearance"
-              className="settings-appearance workspace-panel"
-            >
-              <h2>Appearance</h2>
-              <p className="section-description">
-                Choose your view. Changes apply immediately.
-              </p>
-              <div
-                className="theme-previews"
-                role="radiogroup"
-                aria-label="Color theme"
-              >
-                {[...THEME_OPTIONS]
-                  .sort(
-                    (a, b) =>
-                      ["light", "dark", "system", "schedule"].indexOf(a.value) -
-                      ["light", "dark", "system", "schedule"].indexOf(b.value),
-                  )
-                  .map(({ value, label, Icon }) => (
-                    <button
-                      type="button"
-                      className="theme-preview"
-                      data-theme-option={value}
-                      data-active={preference === value}
-                      role="radio"
-                      aria-checked={preference === value}
-                      key={value}
-                      tabIndex={preference === value ? 0 : -1}
-                      onKeyDown={(event) => {
-                        if (
-                          ![
-                            "ArrowLeft",
-                            "ArrowRight",
-                            "ArrowUp",
-                            "ArrowDown",
-                            "Home",
-                            "End",
-                          ].includes(event.key)
-                        )
-                          return;
-                        event.preventDefault();
-                        const choices = Array.from(
-                          event.currentTarget.parentElement!.querySelectorAll<HTMLButtonElement>(
-                            '[role="radio"]',
-                          ),
-                        );
-                        const index = choices.indexOf(event.currentTarget);
-                        const next =
-                          event.key === "Home"
-                            ? 0
-                            : event.key === "End"
-                              ? choices.length - 1
-                              : (index +
-                                  (event.key === "ArrowLeft" ||
-                                  event.key === "ArrowUp"
-                                    ? -1
-                                    : 1) +
-                                  choices.length) %
-                                choices.length;
-                        choices[next].focus();
-                        choices[next].click();
-                      }}
-                      onClick={() => setPreference(value)}
-                    >
-                      <span className="theme-swatch" aria-hidden="true">
-                        <Icon size={30} strokeWidth={1.4} />
-                        <span className="theme-mini">
-                          <i />
-                          <i />
-                          <i />
-                        </span>
-                      </span>
-                      <span className="theme-preview-label">
-                        <Icon size={17} />
-                        {label}
-                        <span className="selection-dot" />
-                      </span>
-                    </button>
-                  ))}
-              </div>
-              {preference === "schedule" && (
-                <div className="schedule-fields">
-                  <label className="editor-label">
-                    Dark from
-                    <input
-                      className="field"
-                      type="time"
-                      value={schedule.darkFrom}
-                      onChange={(e) =>
-                        setSchedule({ darkFrom: e.target.value || "20:00" })
-                      }
-                    />
-                  </label>
-                  <label className="editor-label">
-                    Until
-                    <input
-                      className="field"
-                      type="time"
-                      value={schedule.darkTo}
-                      onChange={(e) =>
-                        setSchedule({ darkTo: e.target.value || "07:00" })
-                      }
-                    />
-                  </label>
-                </div>
-              )}
-              <p className="section-description" role="status">
-                {scheduleStatus}
-              </p>
-            </section>
+            <div id="appearance">
+              <SettingsAppearance allowSchedule />
+            </div>
             <section
               id="email-delivery"
               className="settings-digest workspace-panel"
