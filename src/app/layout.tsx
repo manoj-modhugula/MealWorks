@@ -12,7 +12,7 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "MealWorks",
+  title: "MealWorks: A better plate, every day.",
   description: "Office café menu, matched to your diet.",
 };
 

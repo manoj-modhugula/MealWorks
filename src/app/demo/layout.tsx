@@ -1,6 +1,5 @@
 import { AppNav } from "@/components/nav";
 import { DemoExperience } from "@/components/demo-experience";
-export const metadata = { title: "MealWorks · Explore the demo" };
 export default function DemoLayout({
   children,
 }: {
